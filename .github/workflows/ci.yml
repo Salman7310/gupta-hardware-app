@@ -1,0 +1,31 @@
+name: ci
+
+on:
+  push:
+    branches: [main, development]
+  pull_request:
+    branches: [main, development]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Also enforces the dependency rule: core, models and services must not
+      # import React, Expo or Drizzle.
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test -- --ci --silent
