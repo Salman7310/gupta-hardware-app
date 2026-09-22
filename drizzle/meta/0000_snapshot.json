@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "6d6b080e-a8fa-4ca1-878c-4ff8f450ca1f",
+  "id": "8dcad4c1-e237-447d-85c0-8fe6ce7781b5",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "customers": {
@@ -477,14 +477,14 @@
           "name": "shop_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "device_id": {
           "name": "device_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "updated_at": {

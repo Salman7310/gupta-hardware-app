@@ -17,7 +17,18 @@
       "package": "com.guptahardware.billing",
       "versionCode": 1
     },
-    "plugins": ["expo-router", "expo-sqlite", "expo-secure-store"],
+    "plugins": [
+      "expo-router",
+      [
+        "expo-sqlite",
+        {
+          "android": {
+            "useSQLCipher": true
+          }
+        }
+      ],
+      "expo-secure-store"
+    ],
     "scheme": "guptahardware"
   }
 }
