@@ -113,8 +113,16 @@ export const stockMovements = sqliteTable(
   (t) => [index('stock_movements_product_idx').on(t.productId, t.occurredAt)],
 );
 
+/**
+ * Device-local configuration. Unlike every other table, shopId is nullable:
+ * the shop id is itself stored here during first-run setup, so the row that
+ * establishes the shop necessarily precedes it.
+ */
 export const settings = sqliteTable('settings', {
   key: text('key').primaryKey(),
   value: text('value').notNull(),
-  ...syncColumns,
+  shopId: text('shop_id'),
+  deviceId: text('device_id'),
+  updatedAt: integer('updated_at').notNull(),
+  deletedAt: integer('deleted_at'),
 });

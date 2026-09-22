@@ -27,6 +27,17 @@ export class Quantity {
     readonly dimensions: readonly Dimension[] = [],
   ) {}
 
+  /** Rebuilds a stored quantity, keeping the measurement working intact. */
+  static restore(
+    amount: number,
+    unitCode: UnitCode,
+    dimensions: readonly Dimension[] = [],
+  ): Quantity {
+    assertInteger(amount, 'quantity amount');
+    assertSafe(amount, 'quantity amount');
+    return new Quantity(amount, unitFor(unitCode), dimensions);
+  }
+
   static of(amount: number, unitCode: UnitCode): Quantity {
     assertInteger(amount, 'quantity amount');
     assertSafe(amount, 'quantity amount');

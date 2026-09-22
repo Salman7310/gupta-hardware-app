@@ -71,8 +71,8 @@ CREATE INDEX `products_shop_name_idx` ON `products` (`shop_id`,`name`);--> state
 CREATE TABLE `settings` (
 	`key` text PRIMARY KEY NOT NULL,
 	`value` text NOT NULL,
-	`shop_id` text NOT NULL,
-	`device_id` text NOT NULL,
+	`shop_id` text,
+	`device_id` text,
 	`updated_at` integer NOT NULL,
 	`deleted_at` integer
 );

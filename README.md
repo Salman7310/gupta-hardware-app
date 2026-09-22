@@ -18,18 +18,24 @@ Not distributed through the Play Store. Installed directly on the shop's phone.
 
 ## Status
 
-Project setup and the calculation core are in place. Sprint 1 is under way.
+Sprint 1 complete. Sprint 2 (products and stock) is next.
 See [`docs/sprints.md`](docs/sprints.md) for the plan.
 
-| Area                               | State                                   |
-| ---------------------------------- | --------------------------------------- |
-| Money and quantity value objects   | done, unit and property tested          |
-| Bill calculator                    | done for line-level discount            |
-| Database schema and migration      | done, sync columns in place             |
-| Product repository and list screen | done, reference vertical slice          |
-| Database encryption                | not started — see Sprint 1              |
-| Backup and restore                 | not started — Sprint 5, gates real data |
-| PDF, scanner, reports              | not started                             |
+| Area                                | State                                         |
+| ----------------------------------- | --------------------------------------------- |
+| Money and quantity value objects    | done, unit and property tested                |
+| Bill calculator                     | done for line-level discount                  |
+| Database schema and migration       | done, sync columns in place                   |
+| Database encryption                 | done, SQLCipher with a Keystore-held key      |
+| Shop and device identity            | done, first-run setup screen                  |
+| Invoice numbering                   | done, per-device series                       |
+| Repositories and ports              | done for products, customers, invoices, stock |
+| In-memory fakes and ViewModel tests | done                                          |
+| Product list screen                 | done, reference vertical slice                |
+| Product create and edit             | not started — Sprint 2                        |
+| CSV catalogue import                | not started — Sprint 2                        |
+| Backup and restore                  | not started — Sprint 5, gates real data       |
+| PDF, scanner, reports               | not started                                   |
 
 ## Getting started
 
