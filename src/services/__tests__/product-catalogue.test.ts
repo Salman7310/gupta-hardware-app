@@ -96,3 +96,75 @@ describe('ProductCatalogue', () => {
     expect(await stock.stockFor(saved[1].id)).toBe(25);
   });
 });
+
+describe('one product, one name', () => {
+  it('refuses a second product with a name already in the catalogue', async () => {
+    const { catalogue } = build();
+    await catalogue.save(draft({ name: 'JK Wall Putty 20kg' }), null);
+
+    const again = await catalogue.save(draft({ name: 'JK Wall Putty 20kg' }), null);
+
+    expect(again.ok).toBe(false);
+    if (again.ok) return;
+    expect(again.error.name).toMatch(/already in the catalogue/i);
+  });
+
+  it('ignores the spacing and case a shopkeeper actually types', async () => {
+    const { catalogue } = build();
+    await catalogue.save(draft({ name: 'JK Wall Putty 20kg' }), null);
+
+    const again = await catalogue.save(draft({ name: '  jk wall  putty 20KG ' }), null);
+
+    expect(again.ok).toBe(false);
+  });
+
+  it('lets a product keep its own name when it is edited', async () => {
+    const { catalogue } = build();
+    const first = await catalogue.save(draft({ name: 'JK Wall Putty 20kg' }), null);
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+
+    const edited = await catalogue.save(
+      draft({ name: 'JK Wall Putty 20kg', salePrice: '799' }),
+      first.value,
+    );
+
+    expect(edited.ok).toBe(true);
+  });
+
+  it('still allows a different name', async () => {
+    const { catalogue } = build();
+    await catalogue.save(draft({ name: 'JK Wall Putty 20kg' }), null);
+
+    const other = await catalogue.save(draft({ name: 'JK Wall Putty 40kg' }), null);
+
+    expect(other.ok).toBe(true);
+  });
+});
+
+describe('importing the same catalogue twice', () => {
+  it('skips rows the preview already flagged as existing', async () => {
+    const { catalogue, products } = build();
+    await catalogue.save(draft({ name: 'Kajaria Floor Tile' }), null);
+
+    const rows = previewProductImport('name,rate\nKajaria Floor Tile,690\nNew Tile,450', [
+      'Kajaria Floor Tile',
+    ]);
+    const imported = await catalogue.importRows(rows.rows);
+
+    // Importing the flagged row anyway is what put two of every product in
+    // the catalogue.
+    expect(imported).toBe(1);
+    expect(await products.list()).toHaveLength(2);
+  });
+
+  it('does not let one file carry the same product twice', async () => {
+    const { catalogue, products } = build();
+
+    const rows = previewProductImport('name,rate\nSame Tile,690\nSame Tile,720');
+    const imported = await catalogue.importRows(rows.rows);
+
+    expect(imported).toBe(1);
+    expect(await products.list()).toHaveLength(1);
+  });
+});

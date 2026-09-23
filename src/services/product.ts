@@ -84,6 +84,13 @@ export function draftFromProduct(product: Product): ProductDraft {
  * Validates a typed draft, reporting one message per field so the form can
  * point at the input that is wrong rather than showing a single banner.
  */
+/**
+ * Names are compared with the spacing and case a shopkeeper actually types,
+ * so "JK Wall Putty 20kg" and "jk wall  putty 20kg" are the same product.
+ */
+export const normaliseProductName = (name: string): string =>
+  name.trim().toLowerCase().replace(/\s+/g, ' ');
+
 export function validateProductDraft(draft: ProductDraft): Result<ValidatedProduct, ProductErrors> {
   const errors: Record<string, string> = {};
   const unit = unitFor(draft.unitCode);

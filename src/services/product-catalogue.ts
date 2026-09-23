@@ -1,4 +1,4 @@
-import { Id, Quantity, Result, ok } from '../core';
+import { Id, Quantity, Result, err, ok } from '../core';
 import { Product } from '../models/product';
 import { MovementKind, StockMovement } from '../models/stock-movement';
 import { ImportRow } from './product-import';
@@ -8,6 +8,7 @@ import {
   ProductErrors,
   ValidatedProduct,
   applyToProduct,
+  normaliseProductName,
   validateProductDraft,
 } from './product';
 
@@ -33,9 +34,22 @@ export class ProductCatalogue {
     const validated = validateProductDraft(draft);
     if (!validated.ok) return validated;
 
+    // Two products with one name split the stock between them and let the
+    // counter bill the wrong one. Refused here rather than on the screen,
+    // because the importer has to be held to the same rule.
+    if (await this.nameTaken(validated.value.name, existing?.id ?? null)) {
+      return err({ name: 'That name is already in the catalogue.' });
+    }
+
     const product = this.build(validated.value, existing);
     await this.products.save(product);
     return ok(product);
+  }
+
+  private async nameTaken(name: string, keepingId: Id | null): Promise<boolean> {
+    const wanted = normaliseProductName(name);
+    const all = await this.products.list();
+    return all.some((p) => p.id !== keepingId && normaliseProductName(p.name) === wanted);
   }
 
   private build(fields: ValidatedProduct, existing: Product | null): Product {
@@ -83,9 +97,20 @@ export class ProductCatalogue {
    */
   async importRows(rows: readonly ImportRow[]): Promise<number> {
     let imported = 0;
+    // Names taken by this run as well as by the catalogue, so a file that
+    // lists the same product twice cannot slip a copy through either.
+    const taken = new Set(
+      (await this.products.list()).map((p) => normaliseProductName(p.name)),
+    );
 
     for (const row of rows) {
       if (!row.result.ok) continue;
+
+      // The preview already showed these as existing. Importing them anyway is
+      // what put two of every product in the catalogue.
+      const name = normaliseProductName(row.result.value.name);
+      if (row.isDuplicate || taken.has(name)) continue;
+      taken.add(name);
 
       const product = this.build(row.result.value, null);
       await this.products.save(product);
