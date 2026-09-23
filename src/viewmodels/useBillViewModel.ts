@@ -6,7 +6,9 @@ import {
   BillDraft,
   BillErrors,
   BillLineField,
+  DimensionField,
   emptyBillDraft,
+  emptyDimensionDraft,
   lineFromProduct,
   readableBillDiscount,
   toLineItem,
@@ -28,6 +30,14 @@ export interface BillViewModel {
   addProduct(product: Product): void;
   removeLine(key: string): void;
   setLineField(key: string, field: BillLineField, value: string): void;
+  addDimension(lineKey: string): void;
+  removeDimension(lineKey: string, dimensionKey: string): void;
+  setDimensionField(
+    lineKey: string,
+    dimensionKey: string,
+    field: DimensionField,
+    value: string,
+  ): void;
   setBillDiscount(value: string): void;
   setPaid(value: string): void;
   setNotes(value: string): void;
@@ -97,6 +107,50 @@ export function useBillViewModel(): BillViewModel {
     }));
   }, []);
 
+  const addDimension = useCallback(
+    (lineKey: string) => {
+      setDraft((current) => ({
+        ...current,
+        lines: current.lines.map((line) =>
+          line.key === lineKey
+            ? { ...line, dimensions: [...line.dimensions, emptyDimensionDraft(ids.next())] }
+            : line,
+        ),
+      }));
+    },
+    [ids],
+  );
+
+  const removeDimension = useCallback((lineKey: string, dimensionKey: string) => {
+    setDraft((current) => ({
+      ...current,
+      lines: current.lines.map((line) =>
+        line.key === lineKey
+          ? { ...line, dimensions: line.dimensions.filter((d) => d.key !== dimensionKey) }
+          : line,
+      ),
+    }));
+  }, []);
+
+  const setDimensionField = useCallback(
+    (lineKey: string, dimensionKey: string, field: DimensionField, value: string) => {
+      setDraft((current) => ({
+        ...current,
+        lines: current.lines.map((line) =>
+          line.key === lineKey
+            ? {
+                ...line,
+                dimensions: line.dimensions.map((d) =>
+                  d.key === dimensionKey ? { ...d, [field]: value } : d,
+                ),
+              }
+            : line,
+        ),
+      }));
+    },
+    [],
+  );
+
   const setBillDiscount = useCallback((billDiscount: string) => {
     setDraft((current) => ({ ...current, billDiscount }));
   }, []);
@@ -151,6 +205,9 @@ export function useBillViewModel(): BillViewModel {
       addProduct,
       removeLine,
       setLineField,
+      addDimension,
+      removeDimension,
+      setDimensionField,
       setBillDiscount,
       setPaid,
       setNotes,
@@ -165,6 +222,9 @@ export function useBillViewModel(): BillViewModel {
       addProduct,
       removeLine,
       setLineField,
+      addDimension,
+      removeDimension,
+      setDimensionField,
       setBillDiscount,
       setPaid,
       setNotes,

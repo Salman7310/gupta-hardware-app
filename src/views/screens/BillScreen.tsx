@@ -15,7 +15,8 @@ import {
 import { Money, unitFor } from '../../core';
 import { Invoice } from '../../models/invoice';
 import { Product } from '../../models/product';
-import { BillLineDraft } from '../../services/bill';
+import { BillLineDraft, DimensionField, isMeasured, toQuantity } from '../../services/bill';
+import { DimensionEntry } from '../components/DimensionEntry';
 import { useBillViewModel } from '../../viewmodels/useBillViewModel';
 import { useProductPickerViewModel } from '../../viewmodels/useProductPickerViewModel';
 import { theme } from '../theme';
@@ -52,6 +53,11 @@ export function BillScreen({ onSaved }: Props) {
               error={vm.errors.lines[line.key]}
               onChange={(field, value) => vm.setLineField(line.key, field, value)}
               onRemove={() => vm.removeLine(line.key)}
+              onDimensionChange={(dimensionKey, field, value) =>
+                vm.setDimensionField(line.key, dimensionKey, field, value)
+              }
+              onAddDimension={() => vm.addDimension(line.key)}
+              onRemoveDimension={(dimensionKey) => vm.removeDimension(line.key, dimensionKey)}
             />
           ))
         )}
@@ -132,14 +138,21 @@ function LineRow({
   error,
   onChange,
   onRemove,
+  onDimensionChange,
+  onAddDimension,
+  onRemoveDimension,
 }: {
   line: BillLineDraft;
   total: Money | null;
   error?: string;
   onChange: (field: 'quantity' | 'discountPercent', value: string) => void;
   onRemove: () => void;
+  onDimensionChange: (dimensionKey: string, field: DimensionField, value: string) => void;
+  onAddDimension: () => void;
+  onRemoveDimension: (dimensionKey: string) => void;
 }) {
   const unit = unitFor(line.unitCode);
+  const measured = isMeasured(line.unitCode);
 
   return (
     <View style={styles.line}>
@@ -155,21 +168,33 @@ function LineRow({
         </Pressable>
       </View>
 
+      {measured ? (
+        <DimensionEntry
+          dimensions={line.dimensions}
+          area={toQuantity(line)}
+          onChange={onDimensionChange}
+          onAdd={onAddDimension}
+          onRemove={onRemoveDimension}
+        />
+      ) : null}
+
       <View style={styles.lineInputs}>
-        <View style={styles.flex}>
-          <Text style={styles.smallLabel}>Quantity</Text>
-          <View style={styles.inputBox}>
-            <TextInput
-              style={styles.input}
-              value={line.quantity}
-              onChangeText={(v) => onChange('quantity', v)}
-              keyboardType="decimal-pad"
-              placeholder="0"
-              placeholderTextColor={theme.textPlaceholder}
-            />
-            <Text style={styles.affix}>{unit.label}</Text>
+        {measured ? null : (
+          <View style={styles.flex}>
+            <Text style={styles.smallLabel}>Quantity</Text>
+            <View style={styles.inputBox}>
+              <TextInput
+                style={styles.input}
+                value={line.quantity}
+                onChangeText={(v) => onChange('quantity', v)}
+                keyboardType="decimal-pad"
+                placeholder="0"
+                placeholderTextColor={theme.textPlaceholder}
+              />
+              <Text style={styles.affix}>{unit.label}</Text>
+            </View>
           </View>
-        </View>
+        )}
 
         <View style={styles.flex}>
           <Text style={styles.smallLabel}>Discount</Text>
