@@ -18,24 +18,31 @@ Not distributed through the Play Store. Installed directly on the shop's phone.
 
 ## Status
 
-Sprint 1 complete. Sprint 2 (products and stock) is next.
-See [`docs/sprints.md`](docs/sprints.md) for the plan.
+Sprint 2 complete. Sprint 3 (the billing engine) is next, but it is blocked on
+the discount question below. See [`docs/sprints.md`](docs/sprints.md).
 
 | Area                                | State                                         |
 | ----------------------------------- | --------------------------------------------- |
 | Money and quantity value objects    | done, unit and property tested                |
 | Bill calculator                     | done for line-level discount                  |
-| Database schema and migration       | done, sync columns in place                   |
+| Database schema and migrations      | done, sync columns in place                   |
 | Database encryption                 | done, SQLCipher with a Keystore-held key      |
 | Shop and device identity            | done, first-run setup screen                  |
 | Invoice numbering                   | done, per-device series                       |
 | Repositories and ports              | done for products, customers, invoices, stock |
 | In-memory fakes and ViewModel tests | done                                          |
-| Product list screen                 | done, reference vertical slice                |
-| Product create and edit             | not started — Sprint 2                        |
-| CSV catalogue import                | not started — Sprint 2                        |
-| Backup and restore                  | not started — Sprint 5, gates real data       |
-| PDF, scanner, reports               | not started                                   |
+| Product list with live stock        | done                                          |
+| Product create and edit             | done, form driven by the unit                 |
+| Stock ledger                        | done, totals derived by summing movements     |
+| CSV catalogue import                | done, with preview and per-row errors         |
+| Barcode lookup                      | not done — deferred, see below                |
+| Billing screen                      | not started — Sprint 3                        |
+| PDF, backup, scanner, reports       | not started                                   |
+
+Barcode scanning was in the Sprint 2 plan and was deliberately dropped rather
+than rushed. It needs camera permission plumbing and another native rebuild,
+and tiles and stone are identified by name and size, not barcode. It belongs
+with sanitaryware, which is not yet in the catalogue.
 
 ## Getting started
 

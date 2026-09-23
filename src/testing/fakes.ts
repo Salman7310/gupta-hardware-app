@@ -80,6 +80,13 @@ export class InMemoryStockMovementRepository implements StockMovementRepository 
     return (await this.listForProduct(productId)).reduce((t, m) => t + m.quantity.amount, 0);
   }
 
+  async stockByProduct(): Promise<Record<Id, number>> {
+    return this.movements.reduce<Record<Id, number>>((totals, m) => {
+      totals[m.productId] = (totals[m.productId] ?? 0) + m.quantity.amount;
+      return totals;
+    }, {});
+  }
+
   async append(movement: StockMovement): Promise<void> {
     this.movements.push(movement);
   }

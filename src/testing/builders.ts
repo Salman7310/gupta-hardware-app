@@ -18,6 +18,10 @@ export function aProduct(over: Partial<Product> = {}): Product {
     hsnCode: null,
     isActive: true,
     updatedAt: 0,
+    piecesPerBox: null,
+    boxCoverageSqIn: null,
+    minStock: null,
+    barcode: null,
     ...over,
   };
 }

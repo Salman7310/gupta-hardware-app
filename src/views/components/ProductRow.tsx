@@ -1,23 +1,37 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { unitFor } from '../../core';
-import { CATEGORY_LABELS, Product } from '../../models/product';
+import { CATEGORY_LABELS } from '../../models/product';
+import { ProductListItem } from '../../viewmodels/useProductListViewModel';
+import { theme } from '../theme';
 
-export function ProductRow({ product }: { product: Product }) {
+export function ProductRow({ item, onPress }: { item: ProductListItem; onPress: () => void }) {
+  const { product, stock, isLow } = item;
   const unit = unitFor(product.unitCode);
+
   return (
-    <View style={styles.row}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+      accessibilityRole="button"
+    >
       <View style={styles.details}>
         <Text style={styles.name} numberOfLines={1}>
           {product.name}
         </Text>
-        <Text style={styles.category}>{CATEGORY_LABELS[product.category]}</Text>
+        <View style={styles.meta}>
+          <Text style={styles.category}>{CATEGORY_LABELS[product.category]}</Text>
+          <Text style={[styles.stock, isLow && styles.stockLow]}>
+            {isLow ? 'Low: ' : ''}
+            {stock.toDisplay()} in stock
+          </Text>
+        </View>
       </View>
       <Text style={styles.rate}>
         {product.salePrice.format()}
         <Text style={styles.unit}>/{unit.label}</Text>
       </Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -28,11 +42,15 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#d8d8d2',
+    borderBottomColor: theme.border,
   },
+  rowPressed: { backgroundColor: '#f1efe8' },
   details: { flex: 1, marginRight: 12 },
-  name: { fontSize: 16, color: '#1a1a18' },
-  category: { fontSize: 13, color: '#6b6b66', marginTop: 2 },
-  rate: { fontSize: 16, color: '#1a1a18' },
-  unit: { fontSize: 13, color: '#6b6b66' },
+  name: { fontSize: 16, color: theme.text },
+  meta: { flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 8 },
+  category: { fontSize: 13, color: theme.textMuted },
+  stock: { fontSize: 13, color: theme.textMuted },
+  stockLow: { color: theme.warningText },
+  rate: { fontSize: 16, color: theme.text },
+  unit: { fontSize: 13, color: theme.textMuted },
 });
