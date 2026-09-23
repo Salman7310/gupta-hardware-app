@@ -1,21 +1,46 @@
-import React from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useCallback, useRef } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { useProductListViewModel } from '../../viewmodels/useProductListViewModel';
 import { ProductRow } from '../components/ProductRow';
+import { theme } from '../theme';
 
-/**
- * View: renders the ViewModel and forwards input to it. No business rules,
- * no data access, no formatting decisions of its own.
- */
-export function ProductListScreen() {
+interface Props {
+  readonly onAdd: () => void;
+  readonly onEdit: (productId: string) => void;
+  readonly onImport: () => void;
+}
+
+export function ProductListScreen({ onAdd, onEdit, onImport }: Props) {
   const vm = useProductListViewModel();
+  const isFirstFocus = useRef(true);
+
+  // Returning from the form or the importer must show what changed. The first
+  // focus is skipped because the ViewModel already loads on mount.
+  useFocusEffect(
+    useCallback(() => {
+      if (isFirstFocus.current) {
+        isFirstFocus.current = false;
+        return;
+      }
+      vm.refresh();
+    }, [vm]),
+  );
 
   return (
     <View style={styles.container}>
       <TextInput
         style={styles.search}
         placeholder="Search products"
-        placeholderTextColor="#8d8d86"
+        placeholderTextColor={theme.textPlaceholder}
         value={vm.query}
         onChangeText={vm.setQuery}
         autoCorrect={false}
@@ -23,36 +48,82 @@ export function ProductListScreen() {
 
       {vm.isLoading ? <ActivityIndicator style={styles.state} /> : null}
       {vm.error ? <Text style={[styles.state, styles.error]}>{vm.error}</Text> : null}
-      {vm.isEmpty ? (
-        <Text style={[styles.state, styles.muted]}>
-          No products yet. Import the shop catalogue to get started.
-        </Text>
+      {vm.hasNoResults ? (
+        <Text style={[styles.state, styles.muted]}>No product matches that search.</Text>
       ) : null}
 
-      <FlatList
-        data={vm.products}
-        keyExtractor={(p) => p.id}
-        renderItem={({ item }) => <ProductRow product={item} />}
-        keyboardShouldPersistTaps="handled"
-      />
+      {vm.isEmpty ? (
+        <View style={styles.empty}>
+          <Text style={styles.emptyText}>
+            No products yet. Import the shop catalogue from a spreadsheet, or add the first product
+            by hand.
+          </Text>
+          <Pressable style={styles.secondary} onPress={onImport} accessibilityRole="button">
+            <Text style={styles.secondaryLabel}>Import from CSV</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <FlatList
+          data={vm.items}
+          keyExtractor={(item) => item.product.id}
+          renderItem={({ item }) => (
+            <ProductRow item={item} onPress={() => onEdit(item.product.id)} />
+          )}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.listContent}
+        />
+      )}
+
+      <Pressable
+        style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+        onPress={onAdd}
+        accessibilityRole="button"
+        accessibilityLabel="Add product"
+      >
+        <Text style={styles.fabLabel}>＋</Text>
+      </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fbfbf9' },
+  container: { flex: 1, backgroundColor: theme.background },
   search: {
     margin: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#1a1a18',
-    backgroundColor: '#ffffff',
+    color: theme.text,
+    backgroundColor: theme.surface,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#d8d8d2',
+    borderColor: theme.border,
     borderRadius: 8,
   },
   state: { marginTop: 24, textAlign: 'center', fontSize: 15 },
-  muted: { color: '#6b6b66', paddingHorizontal: 32, lineHeight: 22 },
-  error: { color: '#a32d2d' },
+  muted: { color: theme.textMuted, paddingHorizontal: 32, lineHeight: 22 },
+  error: { color: theme.danger },
+  empty: { paddingHorizontal: 32, paddingTop: 24, alignItems: 'center', gap: 20 },
+  emptyText: { fontSize: 15, color: theme.textMuted, textAlign: 'center', lineHeight: 22 },
+  secondary: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.accent,
+  },
+  secondaryLabel: { fontSize: 15, color: theme.accent },
+  listContent: { paddingBottom: 96 },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 28,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: theme.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fabPressed: { opacity: 0.85 },
+  fabLabel: { fontSize: 28, color: theme.accentText, lineHeight: 32 },
 });

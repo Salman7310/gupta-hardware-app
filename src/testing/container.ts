@@ -2,6 +2,7 @@
 import type { AppContainer } from '../di/container';
 import { IdentityService } from '../services/identity';
 import { InvoiceNumberService } from '../services/invoice-number';
+import { ProductCatalogue } from '../services/product-catalogue';
 import {
   fixedClock,
   InMemoryCustomerRepository,
@@ -17,12 +18,15 @@ export function makeTestContainer(overrides: Partial<AppContainer> = {}): AppCon
   const settings = new InMemorySettingsRepository();
   const secure = new InMemorySecureKeyStore();
   const ids = new SequentialIdGenerator();
+  const clock = fixedClock(1_700_000_000_000);
+  const productRepository = new InMemoryProductRepository();
+  const stockRepository = new InMemoryStockMovementRepository();
 
   return {
     settings,
     secure,
     ids,
-    clock: fixedClock(1_700_000_000_000),
+    clock,
     identityService: new IdentityService(settings, secure, ids),
     identity: {
       shop: {
@@ -34,11 +38,12 @@ export function makeTestContainer(overrides: Partial<AppContainer> = {}): AppCon
       },
       device: { id: 'device-1', letter: 'A' },
     },
-    productRepository: new InMemoryProductRepository(),
+    productRepository,
+    stockRepository,
     customerRepository: new InMemoryCustomerRepository(),
     invoiceRepository: new InMemoryInvoiceRepository(),
-    stockRepository: new InMemoryStockMovementRepository(),
     invoiceNumbers: new InvoiceNumberService(settings),
+    catalogue: new ProductCatalogue(productRepository, stockRepository, ids, clock, 'shop-1'),
     ...overrides,
   };
 }

@@ -41,6 +41,8 @@ export interface StockMovementRepository {
   listForProduct(productId: Id): Promise<StockMovement[]>;
   /** Current stock in the unit's sub-units, summed from the ledger. */
   stockFor(productId: Id): Promise<number>;
+  /** Totals for the whole catalogue in one query, for the product list. */
+  stockByProduct(): Promise<Record<Id, number>>;
   append(movement: StockMovement): Promise<void>;
 }
 

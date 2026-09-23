@@ -39,6 +39,20 @@ export class DrizzleStockMovementRepository implements StockMovementRepository {
     return rows.length > 0 ? Number(rows[0].total) : 0;
   }
 
+  /** One grouped query rather than one per product. */
+  async stockByProduct(): Promise<Record<Id, number>> {
+    const rows = await this.db
+      .select({
+        productId: stockMovements.productId,
+        total: sql<number>`coalesce(sum(${stockMovements.quantityAmount}), 0)`,
+      })
+      .from(stockMovements)
+      .where(and(eq(stockMovements.shopId, this.shopId), isNull(stockMovements.deletedAt)))
+      .groupBy(stockMovements.productId);
+
+    return Object.fromEntries(rows.map((r) => [r.productId, Number(r.total)]));
+  }
+
   async append(movement: StockMovement): Promise<void> {
     await this.db.insert(stockMovements).values(toStockMovementRow(movement, this.deviceId));
   }

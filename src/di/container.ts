@@ -1,5 +1,6 @@
 import { Identity } from '../services/identity';
 import { InvoiceNumberService } from '../services/invoice-number';
+import { ProductCatalogue } from '../services/product-catalogue';
 import {
   CustomerRepository,
   InvoiceRepository,
@@ -25,6 +26,7 @@ export interface AppContainer extends PlatformServices {
   readonly invoiceRepository: InvoiceRepository;
   readonly stockRepository: StockMovementRepository;
   readonly invoiceNumbers: InvoiceNumberService;
+  readonly catalogue: ProductCatalogue;
 }
 
 export function createContainer(runtime: AppRuntime, identity: Identity): AppContainer {
@@ -32,13 +34,23 @@ export function createContainer(runtime: AppRuntime, identity: Identity): AppCon
   const shopId = identity.shop.id;
   const deviceId = identity.device.id;
 
+  const productRepository = new DrizzleProductRepository(db, shopId, deviceId);
+  const stockRepository = new DrizzleStockMovementRepository(db, shopId, deviceId);
+
   return {
     ...platform,
     identity,
-    productRepository: new DrizzleProductRepository(db, shopId, deviceId),
+    productRepository,
+    stockRepository,
     customerRepository: new DrizzleCustomerRepository(db, shopId, deviceId),
     invoiceRepository: new DrizzleInvoiceRepository(db, shopId, deviceId),
-    stockRepository: new DrizzleStockMovementRepository(db, shopId, deviceId),
     invoiceNumbers: new InvoiceNumberService(platform.settings),
+    catalogue: new ProductCatalogue(
+      productRepository,
+      stockRepository,
+      platform.ids,
+      platform.clock,
+      shopId,
+    ),
   };
 }

@@ -17,6 +17,19 @@ export interface Product {
   readonly hsnCode: string | null;
   readonly isActive: boolean;
   readonly updatedAt: number;
+
+  /**
+   * Tiles are sold by the box but customers ask in square feet ("how many
+   * boxes for a 120 sq ft room?"). These let the app answer without the
+   * shopkeeper reaching for a calculator. Null for anything not boxed.
+   */
+  readonly piecesPerBox: number | null;
+  /** Area one box covers, in whole square inches, matching the sqft unit. */
+  readonly boxCoverageSqIn: number | null;
+
+  /** Low-stock threshold in the product's own sub-units. Null means no alert. */
+  readonly minStock: number | null;
+  readonly barcode: string | null;
 }
 
 export const CATEGORY_LABELS: Record<ProductCategory, string> = {

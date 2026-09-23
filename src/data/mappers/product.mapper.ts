@@ -19,6 +19,10 @@ export function toProduct(row: ProductRow): Product {
     hsnCode: row.hsnCode,
     isActive: row.isActive,
     updatedAt: row.updatedAt,
+    piecesPerBox: row.piecesPerBox,
+    boxCoverageSqIn: row.boxCoverageSqIn,
+    minStock: row.minStock,
+    barcode: row.barcode,
   };
 }
 
@@ -34,6 +38,10 @@ export function toProductRow(product: Product, deviceId: string): ProductInsert 
     taxRateBps: product.taxRateBps,
     hsnCode: product.hsnCode,
     isActive: product.isActive,
+    piecesPerBox: product.piecesPerBox,
+    boxCoverageSqIn: product.boxCoverageSqIn,
+    minStock: product.minStock,
+    barcode: product.barcode,
     deviceId,
     updatedAt: product.updatedAt,
     deletedAt: null,
