@@ -18,26 +18,44 @@ Not distributed through the Play Store. Installed directly on the shop's phone.
 
 ## Status
 
-Sprint 2 complete. Sprint 3 (the billing engine) is next, but it is blocked on
-the discount question below. See [`docs/sprints.md`](docs/sprints.md).
+Sprint 3 is built but not closed. Bills can be written, saved and looked up,
+and both discount rules are implemented. It stays open until the five
+handwritten bills are in the repo and the golden tests reproduce them to the
+paisa, which is the sprint's own definition of done.
+See [`docs/sprints.md`](docs/sprints.md).
 
-| Area                                | State                                         |
-| ----------------------------------- | --------------------------------------------- |
-| Money and quantity value objects    | done, unit and property tested                |
-| Bill calculator                     | done for line-level discount                  |
-| Database schema and migrations      | done, sync columns in place                   |
-| Database encryption                 | done, SQLCipher with a Keystore-held key      |
-| Shop and device identity            | done, first-run setup screen                  |
-| Invoice numbering                   | done, per-device series                       |
-| Repositories and ports              | done for products, customers, invoices, stock |
-| In-memory fakes and ViewModel tests | done                                          |
-| Product list with live stock        | done                                          |
-| Product create and edit             | done, form driven by the unit                 |
-| Stock ledger                        | done, totals derived by summing movements     |
-| CSV catalogue import                | done, with preview and per-row errors         |
-| Barcode lookup                      | not done — deferred, see below                |
-| Billing screen                      | not started — Sprint 3                        |
-| PDF, backup, scanner, reports       | not started                                   |
+| Area                                | State                                          |
+| ----------------------------------- | ---------------------------------------------- |
+| Money and quantity value objects    | done, unit and property tested                 |
+| Bill calculator                     | done, line discount and apportioned lump sum   |
+| Database schema and migrations      | done, sync columns in place                    |
+| Database encryption                 | done, SQLCipher with a Keystore-held key       |
+| Shop and device identity            | done, first-run setup screen                   |
+| Invoice numbering                   | done, per-device series                        |
+| Repositories and ports              | done for products, customers, invoices, stock  |
+| In-memory fakes and ViewModel tests | done                                           |
+| Product list with live stock        | done                                           |
+| Product create and edit             | done, form driven by the unit                  |
+| Stock ledger                        | done, totals derived by summing movements      |
+| CSV catalogue import                | done, with preview and per-row errors          |
+| Creating an invoice                 | done, one transaction, tested against SQLite   |
+| Billing screen                      | done, walk-in only until the customer picker   |
+| Stone measured length by width      | done, feet and inches, working kept on the bill|
+| Bills list and bill detail          | done, newest first, paid / part paid / unpaid  |
+| Icon, launch screen, design system  | done                                           |
+| Customer picker                     | not started — every bill is a walk-in          |
+| Golden tests from the shop's bills  | not started — waiting on the bills             |
+| Barcode lookup                      | not done — deferred, see below                 |
+| PDF, backup, scanner, reports       | not started                                    |
+
+Known problems, none of them cosmetic:
+
+- Importing the same catalogue twice creates a second copy of every product
+  rather than matching on name, and stock then splits across the copies.
+- Stock is allowed to go negative, deliberately, so a wrong stock figure can
+  never block a sale at the counter. Nothing yet draws attention to it.
+- GST is optional on the product form and a blank one saves as 0%. The field
+  shows a grey 18 as a placeholder, which reads like a value.
 
 Barcode scanning was in the Sprint 2 plan and was deliberately dropped rather
 than rushed. It needs camera permission plumbing and another native rebuild,
@@ -115,9 +133,10 @@ answering before the billing screen is built.
 5. Paint: is the shade code recorded on the bill?
 6. Putty: is more than one bag weight stocked per brand? If so they are separate
    products.
-7. Discount: per line, or one lump sum at the bottom? Only line-level is
-   implemented, because a bill-level discount has to be apportioned across lines
-   before tax and the rule cannot be guessed.
+7. Discount: per line, or one lump sum at the bottom? Both are implemented, so
+   this no longer blocks anything — a lump sum is apportioned across the lines
+   by taxable value before tax, which is the method the GST guidance describes.
+   Still worth confirming which the shop uses, so the screen can lead with it.
 8. Are quotations written before a sale, and how often does one become a bill?
 
 GST rates and HSN codes should be read off the shop's existing bills and
