@@ -21,18 +21,25 @@ interface Props {
 
 export function ProductListScreen({ onAdd, onEdit, onImport }: Props) {
   const vm = useProductListViewModel();
+  const { refresh } = vm;
   const isFirstFocus = useRef(true);
 
   // Returning from the form or the importer must show what changed. The first
   // focus is skipped because the ViewModel already loads on mount.
+  //
+  // Depends on `refresh`, which is stable, and never on `vm`: the ViewModel
+  // returns a fresh object after every load, so depending on it would give this
+  // effect a new identity each time, and useFocusEffect re-runs the callback on
+  // every identity change while the screen is focused — refresh, load, refresh,
+  // without end.
   useFocusEffect(
     useCallback(() => {
       if (isFirstFocus.current) {
         isFirstFocus.current = false;
         return;
       }
-      vm.refresh();
-    }, [vm]),
+      refresh();
+    }, [refresh]),
   );
 
   return (
