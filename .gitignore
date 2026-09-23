@@ -49,3 +49,6 @@ google-services.json
 GoogleService-Info.plist
 coverage/
 *.log
+
+# macOS duplicate-file artefacts
+* [0-9].*
