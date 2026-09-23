@@ -17,7 +17,11 @@ export interface LineItemInput {
 export interface CalculatedLine {
   readonly input: LineItemInput;
   readonly gross: Money;
+  /** From this line's own percentage. */
   readonly discount: Money;
+  /** This line's share of a lump sum given at the bottom of the bill. */
+  readonly billDiscountShare: Money;
+  /** Gross less both discounts. What tax is charged on. */
   readonly taxable: Money;
   readonly cgst: Money;
   readonly sgst: Money;
@@ -28,6 +32,11 @@ export interface CalculatedLine {
 export interface BillTotals {
   readonly lines: readonly CalculatedLine[];
   readonly subtotal: Money;
+  /** Sum of the per-line discounts. */
+  readonly lineDiscount: Money;
+  /** The lump sum given at the bottom of the bill, after clamping. */
+  readonly billDiscount: Money;
+  /** Both together — what a bill prints as "Discount". */
   readonly discount: Money;
   readonly taxable: Money;
   readonly cgst: Money;
@@ -47,6 +56,13 @@ export interface InvoiceItem {
   readonly rate: Money;
   readonly taxRateBps: number;
   readonly discountBps: number;
+  /**
+   * The discount actually taken off this line, in rupees. Held as an amount
+   * and not only as `discountBps`, because an apportioned share of a lump sum
+   * rarely lands on a whole basis point and the paise would not survive the
+   * round trip.
+   */
+  readonly discount: Money;
   readonly lineTotal: Money;
 }
 
@@ -59,7 +75,10 @@ export interface Invoice {
   readonly customerId: Id | null;
   readonly issuedAt: number;
   readonly subtotal: Money;
+  /** Line discounts and the bill-level lump sum together. */
   readonly discount: Money;
+  /** The lump sum alone, so a bill can print it on its own row. */
+  readonly billDiscount: Money;
   readonly taxable: Money;
   readonly cgst: Money;
   readonly sgst: Money;

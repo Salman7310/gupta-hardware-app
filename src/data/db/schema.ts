@@ -60,6 +60,8 @@ export const invoices = sqliteTable(
     issuedAt: integer('issued_at').notNull(),
     subtotalPaise: integer('subtotal_paise').notNull(),
     discountPaise: integer('discount_paise').notNull().default(0),
+    /** The lump sum alone, so a bill can print it on its own row. */
+    billDiscountPaise: integer('bill_discount_paise').notNull().default(0),
     taxablePaise: integer('taxable_paise').notNull(),
     cgstPaise: integer('cgst_paise').notNull().default(0),
     sgstPaise: integer('sgst_paise').notNull().default(0),
@@ -83,6 +85,12 @@ export const invoiceItems = sqliteTable(
     ratePaise: integer('rate_paise').notNull(),
     taxRateBps: integer('tax_rate_bps').notNull().default(0),
     discountBps: integer('discount_bps').notNull().default(0),
+    /**
+     * What came off this line in rupees, including its share of a bill-level
+     * lump sum. A share rarely lands on a whole basis point, so the rate alone
+     * cannot reproduce the paise.
+     */
+    discountPaise: integer('discount_paise').notNull().default(0),
     /** Whole sub-units: square inches, millilitres, boxes, bags. Never a decimal. */
     quantityAmount: integer('quantity_amount').notNull(),
     unitCode: text('unit_code').notNull(),

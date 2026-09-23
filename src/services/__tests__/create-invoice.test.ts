@@ -49,10 +49,28 @@ const aLine = (over: Partial<LineItemInput> = {}): LineItemInput => ({
 const aBill = (over: Partial<NewInvoice> = {}): NewInvoice => ({
   lines: [aLine()],
   customerId: null,
+  billDiscount: Money.zero,
   paid: Money.zero,
   notes: null,
   ...over,
 });
+
+// Two rates, so apportionment changes the tax rather than only the presentation.
+const twoRates = [
+  aLine({
+    name: 'Kajaria Floor Tile',
+    quantity: Quantity.of(1, 'box'),
+    rate: Money.fromRupees(600),
+    taxRateBps: 1800,
+  }),
+  aLine({
+    productId: 'product-2',
+    name: 'JK Wall Putty 20kg',
+    quantity: Quantity.of(1, 'bag'),
+    rate: Money.fromRupees(400),
+    taxRateBps: 500,
+  }),
+];
 
 describe('CreateInvoice', () => {
   it('numbers the bill for this device and persists it', async () => {
@@ -217,5 +235,107 @@ describe('CreateInvoice', () => {
     if (result.ok) return;
     expect(result.error.code).toBe('invoice.notSaved');
     expect(result.error.message).toBe('database is locked');
+  });
+});
+
+describe('CreateInvoice with a lump sum off the bottom of the bill', () => {
+  it('spreads the discount across lines in proportion to their taxable value', async () => {
+    const { createInvoice } = build();
+
+    const result = await createInvoice.execute(
+      aBill({ lines: twoRates, billDiscount: Money.fromRupees(100) }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // 600 and 400 of a 1,000 bill take 60 and 40 of the 100 given.
+    expect(result.value.items[0].discount.paise).toBe(6_000);
+    expect(result.value.items[1].discount.paise).toBe(4_000);
+  });
+
+  it('taxes each line on its reduced share, at the rate that line carries', async () => {
+    const { createInvoice } = build();
+
+    const result = await createInvoice.execute(
+      aBill({ lines: twoRates, billDiscount: Money.fromRupees(100) }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // 540 at 18% is 97.20, 360 at 5% is 18.00. Taking 100 off the grand total
+    // instead would have charged tax on the undiscounted value and come to a
+    // different figure — which is the whole reason this is apportioned.
+    expect(result.value.taxable.paise).toBe(90_000);
+    expect(result.value.cgst.add(result.value.sgst).paise).toBe(11_520);
+  });
+
+  it('gives away exactly the discount, including the paise division cannot split', async () => {
+    const { createInvoice } = build();
+    const evenThirds = [0, 1, 2].map((n) =>
+      aLine({
+        productId: `product-${n}`,
+        quantity: Quantity.of(1, 'box'),
+        rate: Money.fromRupees(100),
+      }),
+    );
+
+    const result = await createInvoice.execute(
+      aBill({ lines: evenThirds, billDiscount: Money.fromRupees(1) }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // 100 paise across three equal lines is 33.33 each; the stray paise has to
+    // land somewhere or the shares would not add back to the rupee given.
+    const shares = result.value.items.map((i) => i.discount.paise);
+    expect(shares.reduce((a, b) => a + b, 0)).toBe(100);
+    expect(shares).toEqual([34, 33, 33]);
+  });
+
+  it('records the lump sum separately from the line discounts', async () => {
+    const { createInvoice } = build();
+
+    const result = await createInvoice.execute(
+      aBill({ lines: twoRates, billDiscount: Money.fromRupees(100) }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.billDiscount.paise).toBe(10_000);
+    expect(result.value.discount.paise).toBe(10_000);
+  });
+
+  it('leaves the arithmetic untouched when no lump sum is given', async () => {
+    const { createInvoice } = build();
+
+    const result = await createInvoice.execute(aBill({ lines: twoRates }));
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.taxable.paise).toBe(100_000);
+    expect(result.value.billDiscount.isZero()).toBe(true);
+    expect(result.value.items.every((i) => i.discount.isZero())).toBe(true);
+  });
+
+  it('refuses a discount larger than the bill comes to', async () => {
+    const { createInvoice } = build();
+
+    const result = await createInvoice.execute(
+      aBill({ lines: twoRates, billDiscount: Money.fromRupees(5000) }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe('invoice.discountTooLarge');
+  });
+
+  it('refuses a negative discount', async () => {
+    const { createInvoice } = build();
+
+    const result = await createInvoice.execute(aBill({ billDiscount: Money.fromRupees(-50) }));
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe('invoice.negativeDiscount');
   });
 });

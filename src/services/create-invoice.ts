@@ -10,6 +10,8 @@ import { Clock, IdGenerator, InvoiceRepository } from './ports';
 export interface NewInvoice {
   readonly lines: readonly LineItemInput[];
   readonly customerId: Id | null;
+  /** A lump sum off the bottom of the bill. Zero when the shop discounts per line. */
+  readonly billDiscount: Money;
   readonly paid: Money;
   readonly notes: string | null;
 }
@@ -30,6 +32,10 @@ function validate(input: NewInvoice): AppError | null {
 
   if (input.paid.isNegative()) {
     return appError('invoice.negativePayment', 'Amount paid cannot be negative.');
+  }
+
+  if (input.billDiscount.isNegative()) {
+    return appError('invoice.negativeDiscount', 'Discount cannot be negative.');
   }
 
   return null;
@@ -55,7 +61,16 @@ export class CreateInvoice {
     const problem = validate(input);
     if (problem) return err(problem);
 
-    const totals = calculateBill(input.lines);
+    const totals = calculateBill(input.lines, input.billDiscount);
+
+    // The calculator clamps a discount larger than the bill so a live total
+    // never shows negative tax. Saving one is a different matter: it means the
+    // figure on screen is not the figure asked for, so it is refused here.
+    if (!totals.billDiscount.equals(input.billDiscount)) {
+      return err(
+        appError('invoice.discountTooLarge', 'The discount is more than the bill comes to.'),
+      );
+    }
 
     // Allocating the number before the write means a failed write burns it and
     // leaves a gap in the series. That is the lesser evil: holding the number
@@ -75,6 +90,7 @@ export class CreateInvoice {
       rate: line.input.rate,
       taxRateBps: line.input.taxRateBps,
       discountBps: line.input.discountBps,
+      discount: line.discount.add(line.billDiscountShare),
       lineTotal: line.total,
     }));
 
@@ -99,6 +115,7 @@ export class CreateInvoice {
       issuedAt,
       subtotal: totals.subtotal,
       discount: totals.discount,
+      billDiscount: totals.billDiscount,
       taxable: totals.taxable,
       cgst: totals.cgst,
       sgst: totals.sgst,

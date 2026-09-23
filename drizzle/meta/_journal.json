@@ -15,6 +15,13 @@
       "when": 1790103833382,
       "tag": "0001_lean_praxagora",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790143613861,
+      "tag": "0002_tearful_mentallo",
+      "breakpoints": true
     }
   ]
 }
