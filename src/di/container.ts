@@ -1,4 +1,5 @@
 import { CreateInvoice } from '../services/create-invoice';
+import { CustomerBook } from '../services/customer';
 import { Identity } from '../services/identity';
 import { InvoiceNumberService } from '../services/invoice-number';
 import { ProductCatalogue } from '../services/product-catalogue';
@@ -29,6 +30,7 @@ export interface AppContainer extends PlatformServices {
   readonly invoiceNumbers: InvoiceNumberService;
   readonly createInvoice: CreateInvoice;
   readonly catalogue: ProductCatalogue;
+  readonly customers: CustomerBook;
 }
 
 export function createContainer(runtime: AppRuntime, identity: Identity): AppContainer {
@@ -39,6 +41,7 @@ export function createContainer(runtime: AppRuntime, identity: Identity): AppCon
   const productRepository = new DrizzleProductRepository(db, shopId, deviceId);
   const stockRepository = new DrizzleStockMovementRepository(db, shopId, deviceId);
   const invoiceRepository = new DrizzleInvoiceRepository(db, shopId, deviceId);
+  const customerRepository = new DrizzleCustomerRepository(db, shopId, deviceId);
   const invoiceNumbers = new InvoiceNumberService(platform.settings);
 
   return {
@@ -46,7 +49,7 @@ export function createContainer(runtime: AppRuntime, identity: Identity): AppCon
     identity,
     productRepository,
     stockRepository,
-    customerRepository: new DrizzleCustomerRepository(db, shopId, deviceId),
+    customerRepository,
     invoiceRepository,
     invoiceNumbers,
     createInvoice: new CreateInvoice(
@@ -63,5 +66,6 @@ export function createContainer(runtime: AppRuntime, identity: Identity): AppCon
       platform.clock,
       shopId,
     ),
+    customers: new CustomerBook(customerRepository, platform.ids, platform.clock, shopId),
   };
 }

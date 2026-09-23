@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useContainer } from '../di/provider';
+import { Customer } from '../models/customer';
 import { BillTotals, CalculatedLine, Invoice } from '../models/invoice';
 import { Product } from '../models/product';
 import {
@@ -27,6 +28,9 @@ export interface BillViewModel {
   readonly errors: BillErrors;
   readonly isSaving: boolean;
   readonly isEmpty: boolean;
+  /** Null is a walk-in, which is most counter sales. */
+  readonly customer: Customer | null;
+  setCustomer(customer: Customer | null): void;
   addProduct(product: Product): void;
   removeLine(key: string): void;
   setLineField(key: string, field: BillLineField, value: string): void;
@@ -54,6 +58,7 @@ export function useBillViewModel(): BillViewModel {
   const [draft, setDraft] = useState<BillDraft>(emptyBillDraft);
   const [errors, setErrors] = useState<BillErrors>(NO_ERRORS);
   const [isSaving, setIsSaving] = useState(false);
+  const [customer, setCustomer] = useState<Customer | null>(null);
 
   // Kept beside their keys, so a row can show its own total even though the
   // calculator only ever sees the lines that currently read.
@@ -174,8 +179,7 @@ export function useBillViewModel(): BillViewModel {
     try {
       const result = await createInvoice.execute({
         lines: validated.value.lines,
-        // Walk-in until the customer picker exists. The invoice already allows it.
-        customerId: null,
+        customerId: customer?.id ?? null,
         billDiscount: validated.value.billDiscount,
         paid: validated.value.paid,
         notes: validated.value.notes,
@@ -188,11 +192,12 @@ export function useBillViewModel(): BillViewModel {
 
       setDraft(emptyBillDraft());
       setErrors(NO_ERRORS);
+      setCustomer(null);
       return result.value;
     } finally {
       setIsSaving(false);
     }
-  }, [createInvoice, draft]);
+  }, [createInvoice, draft, customer]);
 
   return useMemo(
     () => ({
@@ -202,6 +207,8 @@ export function useBillViewModel(): BillViewModel {
       errors,
       isSaving,
       isEmpty: draft.lines.length === 0,
+      customer,
+      setCustomer,
       addProduct,
       removeLine,
       setLineField,
@@ -219,6 +226,7 @@ export function useBillViewModel(): BillViewModel {
       lineTotals,
       errors,
       isSaving,
+      customer,
       addProduct,
       removeLine,
       setLineField,

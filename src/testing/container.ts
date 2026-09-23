@@ -1,6 +1,7 @@
 // Type-only, so building a test container never loads the data layer.
 import type { AppContainer } from '../di/container';
 import { CreateInvoice } from '../services/create-invoice';
+import { CustomerBook } from '../services/customer';
 import { IdentityService } from '../services/identity';
 import { InvoiceNumberService } from '../services/invoice-number';
 import { ProductCatalogue } from '../services/product-catalogue';
@@ -26,6 +27,7 @@ export function makeTestContainer(overrides: Partial<AppContainer> = {}): AppCon
   // through it is visible to anything reading stock.
   const invoiceRepository = new InMemoryInvoiceRepository([], stockRepository);
   const invoiceNumbers = new InvoiceNumberService(settings);
+  const customerRepository = new InMemoryCustomerRepository();
   const identity = {
     shop: {
       id: 'shop-1',
@@ -46,11 +48,12 @@ export function makeTestContainer(overrides: Partial<AppContainer> = {}): AppCon
     identity,
     productRepository,
     stockRepository,
-    customerRepository: new InMemoryCustomerRepository(),
+    customerRepository,
     invoiceRepository,
     invoiceNumbers,
     createInvoice: new CreateInvoice(invoiceRepository, invoiceNumbers, ids, clock, identity),
     catalogue: new ProductCatalogue(productRepository, stockRepository, ids, clock, 'shop-1'),
+    customers: new CustomerBook(customerRepository, ids, clock, 'shop-1'),
     ...overrides,
   };
 }

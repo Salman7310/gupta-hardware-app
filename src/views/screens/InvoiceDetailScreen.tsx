@@ -50,6 +50,15 @@ export function InvoiceDetailScreen({ invoiceId }: Props) {
       </View>
 
       <View style={styles.card}>
+        <Text style={styles.customerLabel}>Billed to</Text>
+        <Text style={styles.customerName}>{vm.customer ? vm.customer.name : 'Walk-in customer'}</Text>
+        {vm.customer?.phone ? <Text style={styles.customerMeta}>{vm.customer.phone}</Text> : null}
+        {vm.customer?.gstin ? (
+          <Text style={styles.customerMeta}>GSTIN {vm.customer.gstin}</Text>
+        ) : null}
+      </View>
+
+      <View style={styles.card}>
         {invoice.items.map((item) => (
           <Line key={item.id} item={item} />
         ))}
@@ -145,6 +154,9 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 10,
   },
+  customerLabel: { fontSize: 12, color: theme.textMuted },
+  customerName: { fontSize: 16, color: theme.text, marginTop: 2 },
+  customerMeta: { fontSize: 13, color: theme.textMuted, marginTop: 2 },
   line: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   lineName: { fontSize: 15, color: theme.text },
   lineDetail: { fontSize: 13, color: theme.textMuted, marginTop: 2 },

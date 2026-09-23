@@ -16,6 +16,7 @@ import { Money, unitFor } from '../../core';
 import { Invoice } from '../../models/invoice';
 import { Product } from '../../models/product';
 import { BillLineDraft, DimensionField, isMeasured, toQuantity } from '../../services/bill';
+import { CustomerPicker } from '../components/CustomerPicker';
 import { DimensionEntry } from '../components/DimensionEntry';
 import { useBillViewModel } from '../../viewmodels/useBillViewModel';
 import { useProductPickerViewModel } from '../../viewmodels/useProductPickerViewModel';
@@ -28,6 +29,7 @@ interface Props {
 export function BillScreen({ onSaved }: Props) {
   const vm = useBillViewModel();
   const [isPicking, setIsPicking] = useState(false);
+  const [isPickingCustomer, setIsPickingCustomer] = useState(false);
 
   const submit = async () => {
     const saved = await vm.save();
@@ -40,6 +42,21 @@ export function BillScreen({ onSaved }: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <Pressable
+          style={styles.customer}
+          onPress={() => setIsPickingCustomer(true)}
+          accessibilityRole="button"
+        >
+          <View style={styles.flex}>
+            <Text style={styles.customerLabel}>Customer</Text>
+            <Text style={styles.customerName}>{vm.customer ? vm.customer.name : 'Walk-in'}</Text>
+            {vm.customer?.gstin ? (
+              <Text style={styles.customerMeta}>GSTIN {vm.customer.gstin}</Text>
+            ) : null}
+          </View>
+          <Text style={styles.customerAction}>{vm.customer ? 'Change' : 'Choose'}</Text>
+        </Pressable>
+
         {vm.isEmpty ? (
           <Text style={styles.empty}>
             No items on this bill yet. Add the first one, and the total will follow as you type.
@@ -118,6 +135,20 @@ export function BillScreen({ onSaved }: Props) {
           </Text>
         </Pressable>
       </View>
+
+      <Modal
+        visible={isPickingCustomer}
+        animationType="slide"
+        onRequestClose={() => setIsPickingCustomer(false)}
+      >
+        <CustomerPicker
+          onPick={(customer) => {
+            vm.setCustomer(customer);
+            setIsPickingCustomer(false);
+          }}
+          onClose={() => setIsPickingCustomer(false)}
+        />
+      </Modal>
 
       <Modal visible={isPicking} animationType="slide" onRequestClose={() => setIsPicking(false)}>
         <ProductPicker
@@ -329,6 +360,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.lg,
     paddingTop: space.lg,
   },
+
+  customer: {
+    ...card,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    padding: space.lg,
+    minHeight: size.tap,
+  },
+  customerLabel: { ...type.micro, color: theme.textMuted },
+  customerName: { ...type.bodyStrong, color: theme.text, marginTop: 2 },
+  customerMeta: { ...type.micro, color: theme.textMuted, marginTop: 2 },
+  customerAction: { ...type.label, color: theme.accentInk },
 
   line: { ...card, padding: space.lg, gap: space.md },
   lineHead: { flexDirection: 'row', alignItems: 'flex-start', gap: space.md },
