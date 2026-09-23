@@ -10,7 +10,10 @@ function ProductsActions() {
   const router = useRouter();
   return (
     <View style={styles.headerActions}>
-      <Pressable onPress={() => router.push('/bill')} accessibilityRole="button" hitSlop={12}>
+      <Pressable onPress={() => router.push('/bills')} accessibilityRole="button" hitSlop={12}>
+        <Text style={styles.headerAction}>Bills</Text>
+      </Pressable>
+      <Pressable onPress={() => router.push('/bill/new')} accessibilityRole="button" hitSlop={12}>
         <Text style={styles.headerAction}>New bill</Text>
       </Pressable>
       <Pressable onPress={() => router.push('/import')} accessibilityRole="button" hitSlop={12}>
@@ -37,7 +40,9 @@ export default function RootLayout() {
           />
           <Stack.Screen name="product/[id]" options={{ title: 'Product' }} />
           <Stack.Screen name="import" options={{ title: 'Import catalogue' }} />
-          <Stack.Screen name="bill" options={{ title: 'New bill' }} />
+          <Stack.Screen name="bill/new" options={{ title: 'New bill' }} />
+          <Stack.Screen name="bills" options={{ title: 'Bills' }} />
+          <Stack.Screen name="bill/[id]" options={{ title: 'Bill' }} />
         </Stack>
       </BootstrapGate>
     </SafeAreaProvider>
@@ -45,6 +50,6 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
-  headerActions: { flexDirection: 'row', gap: 18 },
+  headerActions: { flexDirection: 'row', gap: 16 },
   headerAction: { fontSize: 16, color: theme.accent },
 });
