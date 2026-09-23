@@ -1,10 +1,12 @@
 import React, { useCallback, useMemo, type ReactNode } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { bootstrapApp } from '../../di/bootstrap';
 import { createContainer } from '../../di/container';
 import { ContainerProvider } from '../../di/provider';
 import { useBootstrapViewModel } from '../../viewmodels/useBootstrapViewModel';
+import { LaunchScreen } from '../screens/LaunchScreen';
 import { SetupScreen } from '../screens/SetupScreen';
+import { space, theme, type } from '../theme';
 
 /**
  * Holds the app behind start-up and first-run setup.
@@ -22,11 +24,7 @@ export function BootstrapGate({ children }: { children: ReactNode }) {
   );
 
   if (vm.isLoading) {
-    return (
-      <View style={styles.centre}>
-        <ActivityIndicator />
-      </View>
-    );
+    return <LaunchScreen message="Unlocking your shop's data" />;
   }
 
   if (!vm.runtime) {
@@ -56,10 +54,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 32,
-    gap: 8,
-    backgroundColor: '#fbfbf9',
+    padding: space.xxl,
+    gap: space.sm,
+    backgroundColor: theme.background,
   },
-  error: { fontSize: 16, color: '#a32d2d' },
-  detail: { fontSize: 13, color: '#6b6b66', textAlign: 'center' },
+  error: { ...type.heading, color: theme.danger },
+  detail: { ...type.caption, color: theme.textMuted, textAlign: 'center' },
 });

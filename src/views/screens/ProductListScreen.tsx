@@ -11,7 +11,8 @@ import {
 import { useFocusEffect } from 'expo-router';
 import { useProductListViewModel } from '../../viewmodels/useProductListViewModel';
 import { ProductRow } from '../components/ProductRow';
-import { theme } from '../theme';
+import { BrandMark } from '../components/BrandMark';
+import { elevation, radius, size, space, theme, type } from '../theme';
 
 interface Props {
   readonly onAdd: () => void;
@@ -46,6 +47,7 @@ export function ProductListScreen({ onAdd, onEdit, onImport }: Props) {
     <View style={styles.container}>
       <TextInput
         style={styles.search}
+        returnKeyType="search"
         placeholder="Search products"
         placeholderTextColor={theme.textPlaceholder}
         value={vm.query}
@@ -61,9 +63,12 @@ export function ProductListScreen({ onAdd, onEdit, onImport }: Props) {
 
       {vm.isEmpty ? (
         <View style={styles.empty}>
+          <View style={styles.emptyMark}>
+            <BrandMark size={44} color={theme.accent} />
+          </View>
+          <Text style={styles.emptyTitle}>Your catalogue is empty</Text>
           <Text style={styles.emptyText}>
-            No products yet. Import the shop catalogue from a spreadsheet, or add the first product
-            by hand.
+            Import the shop catalogue from a spreadsheet, or add the first product by hand.
           </Text>
           <Pressable style={styles.secondary} onPress={onImport} accessibilityRole="button">
             <Text style={styles.secondaryLabel}>Import from CSV</Text>
@@ -96,41 +101,63 @@ export function ProductListScreen({ onAdd, onEdit, onImport }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.background },
   search: {
-    margin: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
+    margin: space.lg,
+    marginBottom: space.sm,
+    paddingHorizontal: space.lg,
+    height: size.tap,
+    ...type.body,
     color: theme.text,
     backgroundColor: theme.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.border,
-    borderRadius: 8,
+    borderRadius: radius.md,
+    ...elevation.card,
   },
-  state: { marginTop: 24, textAlign: 'center', fontSize: 15 },
-  muted: { color: theme.textMuted, paddingHorizontal: 32, lineHeight: 22 },
+  state: { marginTop: space.xxl, textAlign: 'center', ...type.body },
+  muted: { color: theme.textMuted, paddingHorizontal: space.huge, lineHeight: 22 },
   error: { color: theme.danger },
-  empty: { paddingHorizontal: 32, paddingTop: 24, alignItems: 'center', gap: 20 },
-  emptyText: { fontSize: 15, color: theme.textMuted, textAlign: 'center', lineHeight: 22 },
-  secondary: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.accent,
+
+  empty: { paddingHorizontal: space.huge, paddingTop: space.huge, alignItems: 'center' },
+  emptyMark: {
+    width: 88,
+    height: 88,
+    borderRadius: radius.xl,
+    backgroundColor: theme.accentSurface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: space.xl,
   },
-  secondaryLabel: { fontSize: 15, color: theme.accent },
-  listContent: { paddingBottom: 96 },
+  emptyTitle: { ...type.title, color: theme.text, marginBottom: space.sm },
+  emptyText: {
+    ...type.body,
+    color: theme.textMuted,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: space.xl,
+  },
+  secondary: {
+    paddingHorizontal: space.xl,
+    height: size.tap,
+    justifyContent: 'center',
+    borderRadius: radius.md,
+    backgroundColor: theme.accentSurface,
+  },
+  secondaryLabel: { ...type.label, color: theme.accentInk },
+
+  listContent: { paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: 110 },
+
+  // Sits above the list rather than in it, so the shop can add a product from
+  // anywhere in a long catalogue without scrolling back.
   fab: {
     position: 'absolute',
-    right: 20,
-    bottom: 28,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    right: space.xl,
+    bottom: space.xxl,
+    width: size.fab,
+    height: size.fab,
+    borderRadius: size.fab / 2,
     backgroundColor: theme.accent,
     alignItems: 'center',
     justifyContent: 'center',
+    ...elevation.raised,
   },
-  fabPressed: { opacity: 0.85 },
-  fabLabel: { fontSize: 28, color: theme.accentText, lineHeight: 32 },
+  fabPressed: { backgroundColor: theme.accentPressed },
+  fabLabel: { fontSize: 30, lineHeight: 34, color: theme.accentText },
 });

@@ -4,7 +4,7 @@ import { useFocusEffect } from 'expo-router';
 import { PaymentState } from '../../models/invoice';
 import { InvoiceListItem, useInvoiceListViewModel } from '../../viewmodels/useInvoiceListViewModel';
 import { formatDate, formatTime } from '../format';
-import { theme } from '../theme';
+import { card, radius, size, space, theme, type } from '../theme';
 
 interface Props {
   readonly onOpen: (invoiceId: string) => void;
@@ -86,34 +86,41 @@ export function PaymentBadge({ state }: { state: PaymentState }) {
 
 const styles = StyleSheet.create({
   list: { backgroundColor: theme.background },
-  listContent: { paddingBottom: 32 },
+  listContent: { padding: space.lg, paddingBottom: space.huge },
   centre: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 32,
+    padding: space.xxl,
     backgroundColor: theme.background,
   },
-  empty: { fontSize: 15, color: theme.textMuted, textAlign: 'center', lineHeight: 22 },
-  error: { fontSize: 15, color: theme.danger, textAlign: 'center' },
+  empty: { ...type.body, color: theme.textMuted, textAlign: 'center', lineHeight: 24 },
+  error: { ...type.body, color: theme.danger, textAlign: 'center' },
 
   row: {
+    ...card,
+    minHeight: size.tap,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.border,
+    gap: space.md,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.md,
+    marginBottom: space.sm,
   },
-  rowMain: { flex: 1, gap: 4 },
-  rowSide: { alignItems: 'flex-end', gap: 6 },
-  number: { fontSize: 16, color: theme.text },
-  when: { fontSize: 13, color: theme.textMuted },
-  total: { fontSize: 16, color: theme.text },
+  rowMain: { flex: 1, gap: space.xs },
+  rowSide: { alignItems: 'flex-end', gap: space.sm },
+  number: { ...type.bodyStrong, color: theme.text },
+  when: { ...type.caption, color: theme.textMuted },
+  total: { ...type.bodyStrong, color: theme.text },
 
-  badge: { fontSize: 12, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
-  paid: { color: theme.accent },
+  badge: {
+    ...type.micro,
+    paddingHorizontal: space.sm,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+  },
+  paid: { color: theme.accentInk, backgroundColor: theme.accentSurface },
   partial: { color: theme.warningText, backgroundColor: theme.warningBg },
-  unpaid: { color: theme.danger },
+  unpaid: { color: theme.danger, backgroundColor: theme.dangerSurface },
 });

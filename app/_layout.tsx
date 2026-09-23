@@ -4,7 +4,7 @@ import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BootstrapGate } from '../src/views/components/BootstrapGate';
-import { theme } from '../src/views/theme';
+import { screenOptions, space, theme, type } from '../src/views/theme';
 
 function ProductsActions() {
   const router = useRouter();
@@ -28,7 +28,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <StatusBar style="dark" />
       <BootstrapGate>
-        <Stack screenOptions={{ headerTitleStyle: { fontSize: 17 } }}>
+        <Stack screenOptions={screenOptions}>
           <Stack.Screen
             name="index"
             options={{
@@ -50,6 +50,6 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
-  headerActions: { flexDirection: 'row', gap: 16 },
-  headerAction: { fontSize: 16, color: theme.accent },
+  headerActions: { flexDirection: 'row', gap: space.lg, alignItems: 'center' },
+  headerAction: { ...type.label, color: theme.accentInk },
 });
