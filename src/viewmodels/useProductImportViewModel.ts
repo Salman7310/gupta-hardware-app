@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { PickedImportFile, describeUnreadableFile } from '../services/import-file';
 import { ImportPreview, previewProductImport } from '../services/product-import';
 import { useContainer } from '../di/provider';
 
@@ -20,7 +21,7 @@ export interface ProductImportViewModel {
  * weeks later, mid-bill, as a missing product.
  */
 export function useProductImportViewModel(
-  readFile: () => Promise<{ name: string; text: string } | null>,
+  readFile: () => Promise<PickedImportFile | null>,
 ): ProductImportViewModel {
   const { catalogue, productRepository } = useContainer();
   const [fileName, setFileName] = useState<string | null>(null);
@@ -36,6 +37,16 @@ export function useProductImportViewModel(
     try {
       const file = await readFile();
       if (!file) return;
+
+      // Said plainly, with the file named, rather than parsed into nonsense.
+      if (file.kind !== 'text') {
+        setFileName(file.name);
+        setPreview(null);
+        setImportedCount(null);
+        setError(describeUnreadableFile(file.kind));
+        return;
+      }
+
       const existing = await productRepository.list();
       setFileName(file.name);
       setImportedCount(null);

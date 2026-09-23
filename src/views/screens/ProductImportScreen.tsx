@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { pickTextFile } from '../../data/file-picker';
+import { pickCatalogueFile } from '../../data/file-picker';
 import { describeRowErrors, ImportRow } from '../../services/product-import';
 import { useProductImportViewModel } from '../../viewmodels/useProductImportViewModel';
 import { theme } from '../theme';
@@ -8,14 +8,16 @@ import { theme } from '../theme';
 const PREVIEW_LIMIT = 8;
 
 export function ProductImportScreen({ onDone }: { onDone: () => void }) {
-  const vm = useProductImportViewModel(pickTextFile);
+  const vm = useProductImportViewModel(pickCatalogueFile);
   const preview = vm.preview;
 
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.container}>
       <Text style={styles.intro}>
         Choose a spreadsheet exported as CSV. It needs a name column and a rate column; category,
-        unit, GST, pieces per box, square feet per box and opening stock are used when present.
+        unit, GST, pieces per box, square feet per box and opening stock are used when present. You
+        can pick a PDF or a photo of a price list too, but nothing can be read out of one yet — the
+        app will say so rather than guess at the rates.
       </Text>
 
       <Pressable
@@ -24,7 +26,7 @@ export function ProductImportScreen({ onDone }: { onDone: () => void }) {
         disabled={vm.isPicking}
         accessibilityRole="button"
       >
-        <Text style={styles.buttonLabel}>{vm.isPicking ? 'Opening…' : 'Choose a CSV file'}</Text>
+        <Text style={styles.buttonLabel}>{vm.isPicking ? 'Opening…' : 'Choose a file'}</Text>
       </Pressable>
 
       {vm.error ? <Text style={styles.error}>{vm.error}</Text> : null}
