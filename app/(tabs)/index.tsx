@@ -1,6 +1,6 @@
 import React from 'react';
 import { useRouter } from 'expo-router';
-import { ProductListScreen } from '../src/views/screens/ProductListScreen';
+import { ProductListScreen } from '../../src/views/screens/ProductListScreen';
 
 export default function ProductsRoute() {
   const router = useRouter();

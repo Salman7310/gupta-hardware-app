@@ -157,6 +157,8 @@ export function previewProductImport(
       unitCode,
       salePrice: at(cells, columns.salePrice),
       purchasePrice: at(cells, columns.purchasePrice),
+      // Explicitly whatever the sheet says, including nothing. A spreadsheet
+      // with no GST column must not silently acquire the form's default.
       taxPercent: at(cells, columns.taxPercent),
       hsnCode: at(cells, columns.hsnCode),
       piecesPerBox: at(cells, columns.piecesPerBox),

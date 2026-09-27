@@ -18,7 +18,7 @@ export function BrandMark({ size = 72, color = '#FFFFFF' }: { size?: number; col
   const laid = { width: tile, height: tile, borderRadius, backgroundColor: color };
 
   return (
-    <View style={{ width: size, height: size }} accessibilityRole="image" accessibilityLabel="Gupta Hardware">
+    <View style={{ width: size, height: size }} accessibilityRole="image" accessibilityLabel="Gupta Home Solutions">
       <View style={[styles.tile, laid, { top: 0, left: 0 }]} />
       <View style={[styles.tile, laid, { top: 0, left: far }]} />
       <View style={[styles.tile, laid, { top: far, left: 0 }]} />

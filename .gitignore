@@ -40,6 +40,11 @@ yarn-error.*
 /ios
 /android
 
+# build output of the local native modules. /android above does not cover
+# these, because they live under modules/ and are real source.
+modules/*/android/build/
+modules/*/android/.cxx/
+
 # project
 *.keystore
 .env

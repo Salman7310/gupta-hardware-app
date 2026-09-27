@@ -11,7 +11,24 @@ describe('validateProductDraft', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.salePrice.paise).toBe(45000);
-    expect(result.value.taxRateBps).toBe(0);
+  });
+
+  /**
+   * A new product starts at 18% rather than at nothing. The field used to
+   * show a grey 18 behind an empty box, which reads as a value already set —
+   * and a blank saved as 0%, so the shop issued a tax invoice charging no
+   * tax at all on ₹72,500.
+   */
+  it('starts a new product at 18% GST rather than at nothing', () => {
+    expect(emptyProductDraft().taxPercent).toBe('18');
+    const result = validateProductDraft(draft());
+    expect(result.ok && result.value.taxRateBps).toBe(1800);
+  });
+
+  /** Cleared on purpose is still allowed, for anything genuinely exempt. */
+  it('accepts 0% when the shopkeeper clears the field deliberately', () => {
+    const result = validateProductDraft(draft({ taxPercent: '' }));
+    expect(result.ok && result.value.taxRateBps).toBe(0);
   });
 
   it('reports errors per field, not as one banner', () => {

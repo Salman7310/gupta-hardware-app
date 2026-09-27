@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Gupta Hardware",
+    "name": "Gupta Home Solutions",
     "slug": "gupta-hardware-app",
     "version": "0.1.0",
     "orientation": "portrait",
@@ -15,7 +15,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.guptahardware.billing",
-      "versionCode": 1
+      "versionCode": 2
     },
     "plugins": [
       "expo-router",
@@ -36,7 +36,9 @@
           "imageWidth": 200,
           "resizeMode": "contain"
         }
-      ]
+      ],
+      "expo-sharing",
+      "./plugins/withReleaseSigning"
     ],
     "scheme": "guptahardware",
     "backgroundColor": "#FBFBF9"

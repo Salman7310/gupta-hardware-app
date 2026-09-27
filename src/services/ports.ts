@@ -2,6 +2,9 @@ import { Id } from '../core';
 import { Product } from '../models/product';
 import { Customer } from '../models/customer';
 import { Invoice } from '../models/invoice';
+import { Payment } from '../models/payment';
+import { Quotation } from '../models/quotation';
+import { BackupTables } from './backup';
 import { StockMovement } from '../models/stock-movement';
 
 /**
@@ -30,11 +33,49 @@ export interface InvoiceRepository {
   findById(id: Id): Promise<Invoice | null>;
   listRecent(limit: number): Promise<Invoice[]>;
   /**
-   * Writes the invoice, its lines and the resulting stock movements as one
-   * unit. A bill that reduced stock but failed to save, or vice versa, is
-   * worse than a bill that failed outright.
+   * Writes the invoice, its lines, the resulting stock movements and any
+   * opening payment as one unit. A bill that reduced stock but failed to save,
+   * or that took money without recording the sale, is worse than a bill that
+   * failed outright.
    */
-  create(invoice: Invoice, movements: readonly StockMovement[]): Promise<void>;
+  create(
+    invoice: Invoice,
+    movements: readonly StockMovement[],
+    receipts: readonly Payment[],
+  ): Promise<void>;
+  /**
+   * Every bill still carrying a balance, oldest first.
+   *
+   * Deliberately not a slice of the recent ones: the debt a shop most wants to
+   * see is the one that has been waiting longest, which is exactly the bill a
+   * recency window would hide.
+   */
+  listUnsettled(): Promise<Invoice[]>;
+}
+
+/**
+ * Quotations are read and written whole, like invoices, and never take part in
+ * what is owed: an estimate is an offer, not a debt. The one thing that
+ * changes after it is written is whether it turned into a sale.
+ */
+export interface QuotationRepository {
+  findById(id: Id): Promise<Quotation | null>;
+  listRecent(limit: number): Promise<Quotation[]>;
+  create(quotation: Quotation): Promise<void>;
+  /** Records the bill a quotation became, so the shop can see what converted. */
+  markAccepted(quotationId: Id, invoiceId: Id, at: number): Promise<void>;
+}
+
+export interface PaymentRepository {
+  listForInvoice(invoiceId: Id): Promise<Payment[]>;
+  /** Totals in paise for every bill at once, for the bill list. */
+  paidByInvoice(): Promise<Record<Id, number>>;
+  /**
+   * Appends a receipt. There is deliberately no update or delete: a payment
+   * entered wrongly is corrected by recording the reversal, so the history
+   * stays honest and nothing a customer was told can quietly disappear.
+   */
+  append(payment: Payment): Promise<void>;
 }
 
 export interface StockMovementRepository {
@@ -57,6 +98,35 @@ export interface SettingsRepository {
   increment(key: string): Promise<number>;
 }
 
+/**
+ * Reads and writes the whole database, for backup and restore.
+ *
+ * Deliberately table-shaped rather than model-shaped: a backup has to carry
+ * every column exactly as stored, including the sync columns no domain model
+ * exposes, or a restored shop would not be the shop that was backed up.
+ */
+export interface BackupRepository {
+  dump(): Promise<BackupTables>;
+  /**
+   * Replaces everything, in one transaction. A restore that half-succeeded
+   * would leave the shop with a database that is neither the old one nor the
+   * new one, which is worse than a restore that refused.
+   */
+  replaceAll(tables: BackupTables): Promise<void>;
+}
+
+/**
+ * Where a backup file is written and read. Separate from the document filer
+ * because a backup is not a document: nobody reads it, and unlike a bill it
+ * has to be readable back in.
+ */
+export interface BackupFiler {
+  /** Writes into the folder the shop chose. Null if no folder was granted. */
+  write(fileName: string, contents: string): Promise<string | null>;
+  /** Asks the owner to pick a backup file. Null if they dismissed the picker. */
+  pick(): Promise<{ readonly name: string; readonly contents: string } | null>;
+}
+
 /** Device-bound secret storage, backed by the Android Keystore. */
 export interface SecureKeyStore {
   get(key: string): Promise<string | null>;
@@ -72,3 +142,46 @@ export interface Clock {
 }
 
 export const systemClock: Clock = { now: () => Date.now() };
+
+/**
+ * Where a generated document ends up — a bill or a quotation alike.
+ *
+ * Kept behind a port because rendering a PDF, opening a share sheet and
+ * writing into a folder the owner granted access to are all device concerns.
+ * The business layer decides what a document says; this decides where the file
+ * goes.
+ */
+export interface DocumentFiler {
+  /** Renders the document to a PDF in temporary storage and returns its uri. */
+  render(html: string): Promise<string>;
+  /** Hands the file to the system share sheet. */
+  share(fileUri: string, fileName: string): Promise<void>;
+  /**
+   * Writes a copy into the folder the shop chose, asking for one the first
+   * time. Returns the uri written, or null if the owner dismissed the picker.
+   *
+   * The folder is outside the app's own storage on purpose: anything the app
+   * owns is deleted with it, and a shop that loses five years of bills to an
+   * uninstall has lost its records.
+   */
+  keep(fileUri: string, fileName: string): Promise<string | null>;
+  /** Whether a folder has already been chosen, so the UI can say where files go. */
+  chosenFolder(): Promise<string | null>;
+  /** Forgets the folder, so the next save asks again. */
+  forgetFolder(): Promise<void>;
+  /**
+   * Whether WhatsApp is on this phone, so the screen can offer it rather than
+   * showing a button that fails when tapped.
+   */
+  canShareOnWhatsApp(): Promise<boolean>;
+  /**
+   * Sends the file into WhatsApp directly, at one contact's chat when the jid
+   * reads and at WhatsApp's own picker when it does not.
+   */
+  shareOnWhatsApp(
+    fileUri: string,
+    fileName: string,
+    message: string,
+    jid: string | null,
+  ): Promise<void>;
+}

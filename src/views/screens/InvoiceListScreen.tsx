@@ -4,13 +4,14 @@ import { useFocusEffect } from 'expo-router';
 import { PaymentState } from '../../models/invoice';
 import { InvoiceListItem, useInvoiceListViewModel } from '../../viewmodels/useInvoiceListViewModel';
 import { formatDate, formatTime } from '../format';
-import { card, radius, size, space, theme, type } from '../theme';
+import { card, elevation, radius, size, space, theme, type } from '../theme';
 
 interface Props {
   readonly onOpen: (invoiceId: string) => void;
+  readonly onNewBill: () => void;
 }
 
-export function InvoiceListScreen({ onOpen }: Props) {
+export function InvoiceListScreen({ onOpen, onNewBill }: Props) {
   const vm = useInvoiceListViewModel();
   const { refresh } = vm;
 
@@ -22,6 +23,29 @@ export function InvoiceListScreen({ onOpen }: Props) {
     }, [refresh]),
   );
 
+  return (
+    <View style={styles.screen}>
+      <Body vm={vm} onOpen={onOpen} />
+
+      <Pressable
+        style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+        onPress={onNewBill}
+        accessibilityRole="button"
+        accessibilityLabel="New bill"
+      >
+        <Text style={styles.fabLabel}>＋</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function Body({
+  vm,
+  onOpen,
+}: {
+  vm: ReturnType<typeof useInvoiceListViewModel>;
+  onOpen: (invoiceId: string) => void;
+}) {
   if (vm.isLoading) {
     return (
       <View style={styles.centre}>
@@ -65,6 +89,9 @@ function Row({ item, onPress }: { item: InvoiceListItem; onPress: () => void }) 
   return (
     <Pressable style={styles.row} onPress={onPress} accessibilityRole="button">
       <View style={styles.rowMain}>
+        <Text style={styles.customer} numberOfLines={1}>
+          {item.customerName ?? 'Walk-in'}
+        </Text>
         <Text style={styles.number}>{invoice.invoiceNo}</Text>
         <Text style={styles.when}>
           {formatDate(invoice.issuedAt)} · {formatTime(invoice.issuedAt)} · {invoice.items.length}{' '}
@@ -85,8 +112,10 @@ export function PaymentBadge({ state }: { state: PaymentState }) {
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: theme.background },
   list: { backgroundColor: theme.background },
-  listContent: { padding: space.lg, paddingBottom: space.huge },
+  // Clears the floating action, so the newest bill is never sitting under it.
+  listContent: { padding: space.lg, paddingBottom: 110 },
   centre: {
     flex: 1,
     alignItems: 'center',
@@ -109,7 +138,8 @@ const styles = StyleSheet.create({
   },
   rowMain: { flex: 1, gap: space.xs },
   rowSide: { alignItems: 'flex-end', gap: space.sm },
-  number: { ...type.bodyStrong, color: theme.text },
+  customer: { ...type.bodyStrong, color: theme.text },
+  number: { ...type.caption, color: theme.textLabel },
   when: { ...type.caption, color: theme.textMuted },
   total: { ...type.bodyStrong, color: theme.text },
 
@@ -120,6 +150,21 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     overflow: 'hidden',
   },
+  fab: {
+    position: 'absolute',
+    right: space.xl,
+    bottom: space.xxl,
+    width: size.fab,
+    height: size.fab,
+    borderRadius: size.fab / 2,
+    backgroundColor: theme.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...elevation.raised,
+  },
+  fabPressed: { backgroundColor: theme.accentPressed },
+  fabLabel: { fontSize: 30, lineHeight: 34, color: theme.accentText },
+
   paid: { color: theme.accentInk, backgroundColor: theme.accentSurface },
   partial: { color: theme.warningText, backgroundColor: theme.warningBg },
   unpaid: { color: theme.danger, backgroundColor: theme.dangerSurface },

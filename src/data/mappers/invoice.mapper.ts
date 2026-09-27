@@ -38,7 +38,16 @@ export function toInvoiceItem(row: ItemRow): InvoiceItem {
   };
 }
 
-export function toInvoice(row: InvoiceRow, items: readonly ItemRow[]): Invoice {
+/**
+ * `paidPaise` is passed in rather than read off the row: what has been paid is
+ * the sum of the bill's receipts in the payments ledger, and the column on the
+ * invoice is a legacy of the version before that ledger existed.
+ */
+export function toInvoice(
+  row: InvoiceRow,
+  items: readonly ItemRow[],
+  paidPaise: number,
+): Invoice {
   return {
     id: row.id,
     shopId: row.shopId,
@@ -53,7 +62,7 @@ export function toInvoice(row: InvoiceRow, items: readonly ItemRow[]): Invoice {
     sgst: Money.fromPaise(row.sgstPaise),
     roundOff: Money.fromPaise(row.roundOffPaise),
     grandTotal: Money.fromPaise(row.grandTotalPaise),
-    paid: Money.fromPaise(row.paidPaise),
+    paid: Money.fromPaise(paidPaise),
     notes: row.notes,
     items: items.map(toInvoiceItem),
   };
@@ -74,7 +83,7 @@ export function toInvoiceRow(invoice: Invoice, deviceId: string): InvoiceInsert 
     sgstPaise: invoice.sgst.paise,
     roundOffPaise: invoice.roundOff.paise,
     grandTotalPaise: invoice.grandTotal.paise,
-    paidPaise: invoice.paid.paise,
+    // Deliberately not written: the payments ledger owns what has been paid.
     notes: invoice.notes,
     deviceId,
     updatedAt: invoice.issuedAt,

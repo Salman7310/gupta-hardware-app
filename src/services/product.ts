@@ -44,13 +44,22 @@ export interface ValidatedProduct {
   readonly barcode: string | null;
 }
 
+/**
+ * GST is prefilled rather than hinted. It was a grey "18" behind an empty
+ * field, which reads as a value that is already set — and a blank saves as
+ * 0%, so the shop issued a tax invoice charging no tax. A real default can be
+ * cleared deliberately by a shop that sells something exempt; a placeholder
+ * could only be missed.
+ */
+const DEFAULT_GST_PERCENT = '18';
+
 export const emptyProductDraft = (): ProductDraft => ({
   name: '',
   category: 'tiles',
   unitCode: 'box',
   salePrice: '',
   purchasePrice: '',
-  taxPercent: '',
+  taxPercent: DEFAULT_GST_PERCENT,
   hsnCode: '',
   piecesPerBox: '',
   sqftPerBox: '',

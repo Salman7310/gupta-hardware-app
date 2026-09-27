@@ -15,7 +15,7 @@ import {
 const NOW = 1_700_000_000_000;
 
 const identity: Identity = {
-  shop: { id: 'shop-1', name: 'Gupta Hardware', address: null, gstin: null, invoicePrefix: 'GH' },
+  shop: { id: 'shop-1', name: 'Gupta Hardware', address: null, phone: null, gstin: null, invoicePrefix: 'GH' },
   device: { id: 'device-1', letter: 'A' },
 };
 
@@ -223,6 +223,7 @@ describe('CreateInvoice', () => {
     const failing: InvoiceRepository = {
       findById: async () => null,
       listRecent: async () => [],
+      listUnsettled: async () => [],
       create: async () => {
         throw new Error('database is locked');
       },

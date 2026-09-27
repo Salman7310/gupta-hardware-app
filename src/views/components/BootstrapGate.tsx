@@ -18,9 +18,11 @@ export function BootstrapGate({ children }: { children: ReactNode }) {
   const bootstrap = useCallback(() => bootstrapApp(), []);
   const vm = useBootstrapViewModel(bootstrap);
 
+  const { reloadIdentity } = vm;
   const container = useMemo(
-    () => (vm.runtime && vm.identity ? createContainer(vm.runtime, vm.identity) : null),
-    [vm.runtime, vm.identity],
+    () =>
+      vm.runtime && vm.identity ? createContainer(vm.runtime, vm.identity, reloadIdentity) : null,
+    [vm.runtime, vm.identity, reloadIdentity],
   );
 
   if (vm.isLoading) {

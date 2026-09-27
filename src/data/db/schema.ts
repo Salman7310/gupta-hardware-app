@@ -67,6 +67,11 @@ export const invoices = sqliteTable(
     sgstPaise: integer('sgst_paise').notNull().default(0),
     roundOffPaise: integer('round_off_paise').notNull().default(0),
     grandTotalPaise: integer('grand_total_paise').notNull(),
+    /**
+     * Superseded by the payments ledger and no longer read. Kept so the
+     * migration that introduced `payments` could backfill from it, and so an
+     * older build that still reads it is not left with a null column.
+     */
     paidPaise: integer('paid_paise').notNull().default(0),
     notes: text('notes'),
     ...syncColumns,
@@ -123,6 +128,84 @@ export const stockMovements = sqliteTable(
     ...syncColumns,
   },
   (t) => [index('stock_movements_product_idx').on(t.productId, t.occurredAt)],
+);
+
+/**
+ * Money received against a bill, as a ledger rather than a running total on
+ * the invoice row, for the same reason stock is a ledger. A part payment is a
+ * new fact, not an edit: appending never conflicts under sync, whereas two
+ * counters each rewriting `paid` would lose one of the receipts silently. What
+ * is owed is the bill less the sum of these rows.
+ */
+export const payments = sqliteTable(
+  'payments',
+  {
+    id: text('id').primaryKey(),
+    invoiceId: text('invoice_id').notNull(),
+    amountPaise: integer('amount_paise').notNull(),
+    /** cash, upi, card, bank or other. */
+    method: text('method').notNull(),
+    receivedAt: integer('received_at').notNull(),
+    note: text('note'),
+    ...syncColumns,
+  },
+  (t) => [index('payments_invoice_idx').on(t.invoiceId, t.receivedAt)],
+);
+
+/**
+ * Estimates given across the counter, before anything is sold.
+ *
+ * A separate pair of tables rather than a flag on `invoices`, because a
+ * quotation is a different thing with different rules: it takes no number from
+ * the invoice series, moves no stock, is owed by nobody and must never be
+ * swept up by a query for what a customer owes. One table with a mode column
+ * would make every one of those queries a place to forget the filter.
+ */
+export const quotations = sqliteTable(
+  'quotations',
+  {
+    id: text('id').primaryKey(),
+    /** Its own per-device series, e.g. GH/QA/0007. */
+    quotationNo: text('quotation_no').notNull(),
+    customerId: text('customer_id'),
+    issuedAt: integer('issued_at').notNull(),
+    /** When the prices stop standing. Expiry is derived from this, never stored. */
+    validUntil: integer('valid_until').notNull(),
+    subtotalPaise: integer('subtotal_paise').notNull(),
+    discountPaise: integer('discount_paise').notNull().default(0),
+    billDiscountPaise: integer('bill_discount_paise').notNull().default(0),
+    taxablePaise: integer('taxable_paise').notNull(),
+    cgstPaise: integer('cgst_paise').notNull().default(0),
+    sgstPaise: integer('sgst_paise').notNull().default(0),
+    roundOffPaise: integer('round_off_paise').notNull().default(0),
+    grandTotalPaise: integer('grand_total_paise').notNull(),
+    /** The bill this became, once the customer accepted it. */
+    acceptedInvoiceId: text('accepted_invoice_id'),
+    notes: text('notes'),
+    ...syncColumns,
+  },
+  (t) => [index('quotations_shop_issued_idx').on(t.shopId, t.issuedAt)],
+);
+
+export const quotationItems = sqliteTable(
+  'quotation_items',
+  {
+    id: text('id').primaryKey(),
+    quotationId: text('quotation_id').notNull(),
+    productId: text('product_id'),
+    /** Snapshots, as on a bill: the price quoted is the price honoured. */
+    nameSnapshot: text('name_snapshot').notNull(),
+    ratePaise: integer('rate_paise').notNull(),
+    taxRateBps: integer('tax_rate_bps').notNull().default(0),
+    discountBps: integer('discount_bps').notNull().default(0),
+    discountPaise: integer('discount_paise').notNull().default(0),
+    quantityAmount: integer('quantity_amount').notNull(),
+    unitCode: text('unit_code').notNull(),
+    dimensionsJson: text('dimensions_json'),
+    linePaise: integer('line_paise').notNull(),
+    ...syncColumns,
+  },
+  (t) => [index('quotation_items_quotation_idx').on(t.quotationId)],
 );
 
 /**

@@ -1,11 +1,13 @@
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { Id } from '../../core';
 import { Invoice } from '../../models/invoice';
+import { Payment } from '../../models/payment';
 import { StockMovement } from '../../models/stock-movement';
 import { InvoiceRepository } from '../../services/ports';
 import { Database } from '../db/client';
-import { invoiceItems, invoices, stockMovements } from '../db/schema';
+import { invoiceItems, invoices, payments, stockMovements } from '../db/schema';
 import { toInvoice, toInvoiceItemRow, toInvoiceRow } from '../mappers/invoice.mapper';
+import { toPaymentRow } from '../mappers/payment.mapper';
 import { toStockMovementRow } from '../mappers/stock-movement.mapper';
 
 export class DrizzleInvoiceRepository implements InvoiceRepository {
@@ -28,7 +30,34 @@ export class DrizzleInvoiceRepository implements InvoiceRepository {
     if (rows.length === 0) return null;
 
     const items = await this.db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, id));
-    return toInvoice(rows[0], items);
+    const paid = await this.paidFor([id]);
+    return toInvoice(rows[0], items, paid[id] ?? 0);
+  }
+
+  /**
+   * What has been received against these bills, summed from the ledger. The
+   * invoice row carries a `paid_paise` column from before payments were kept
+   * as receipts; it is no longer read, because a bill part-paid later would
+   * leave it stale.
+   */
+  private async paidFor(invoiceIds: readonly string[]): Promise<Record<string, number>> {
+    if (invoiceIds.length === 0) return {};
+
+    const rows = await this.db
+      .select({ invoiceId: payments.invoiceId, amountPaise: payments.amountPaise })
+      .from(payments)
+      .where(
+        and(
+          eq(payments.shopId, this.shopId),
+          isNull(payments.deletedAt),
+          inArray(payments.invoiceId, [...invoiceIds]),
+        ),
+      );
+
+    return rows.reduce<Record<string, number>>((totals, row) => {
+      totals[row.invoiceId] = (totals[row.invoiceId] ?? 0) + row.amountPaise;
+      return totals;
+    }, {});
   }
 
   async listRecent(limit: number): Promise<Invoice[]> {
@@ -50,10 +79,50 @@ export class DrizzleInvoiceRepository implements InvoiceRepository {
         ),
       );
 
+    const paid = await this.paidFor(rows.map((r) => r.id));
+
     return rows.map((row) =>
       toInvoice(
         row,
         items.filter((i) => i.invoiceId === row.id),
+        paid[row.id] ?? 0,
+      ),
+    );
+  }
+
+  /**
+   * Invoice rows carry no line items, so reading the whole series to find the
+   * unsettled ones is cheap; the items are then fetched only for the bills
+   * that are actually owed. Filtering in SQL would need a join against the
+   * payments ledger, which is worth doing when a shop has years of bills.
+   */
+  async listUnsettled(): Promise<Invoice[]> {
+    const rows = await this.db
+      .select()
+      .from(invoices)
+      .where(this.scope)
+      .orderBy(asc(invoices.issuedAt));
+    if (rows.length === 0) return [];
+
+    const paid = await this.paidFor(rows.map((r) => r.id));
+    const owing = rows.filter((row) => (paid[row.id] ?? 0) < row.grandTotalPaise);
+    if (owing.length === 0) return [];
+
+    const items = await this.db
+      .select()
+      .from(invoiceItems)
+      .where(
+        inArray(
+          invoiceItems.invoiceId,
+          owing.map((r) => r.id),
+        ),
+      );
+
+    return owing.map((row) =>
+      toInvoice(
+        row,
+        items.filter((i) => i.invoiceId === row.id),
+        paid[row.id] ?? 0,
       ),
     );
   }
@@ -63,7 +132,11 @@ export class DrizzleInvoiceRepository implements InvoiceRepository {
    * bill that reduced stock but did not save, or saved without reducing stock,
    * leaves the shopkeeper with books that do not reconcile.
    */
-  async create(invoice: Invoice, movements: readonly StockMovement[]): Promise<void> {
+  async create(
+    invoice: Invoice,
+    movements: readonly StockMovement[],
+    receipts: readonly Payment[],
+  ): Promise<void> {
     await this.db.transaction(async (tx) => {
       await tx.insert(invoices).values(toInvoiceRow(invoice, this.deviceId));
 
@@ -73,6 +146,11 @@ export class DrizzleInvoiceRepository implements InvoiceRepository {
 
       for (const movement of movements) {
         await tx.insert(stockMovements).values(toStockMovementRow(movement, this.deviceId));
+      }
+
+      // Money handed over at the counter belongs to the same write as the sale.
+      for (const receipt of receipts) {
+        await tx.insert(payments).values(toPaymentRow(receipt, this.deviceId));
       }
     });
   }

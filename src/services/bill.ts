@@ -47,9 +47,19 @@ export interface BillLineDraft {
   readonly unitCode: UnitCode;
   readonly rate: Money;
   readonly taxRateBps: number;
-  /** Used when the unit is entered whole or as a decimal. */
+  /** The quantity as a plain number, in the unit's own terms. */
   readonly quantity: string;
-  /** Used when the unit is entered as measurements, which is stone. */
+  /**
+   * True when the shopkeeper is measuring pieces rather than typing a total.
+   *
+   * Stone can be entered either way and the shop uses both. Most of the time
+   * they already know the figure — the slab is labelled, or they worked it out
+   * on the customer's plan — and typing "24.75" is three taps against twelve.
+   * Measuring is for the pieces they cut at the counter, where the working
+   * printed under the line is what stops an argument about the total.
+   */
+  readonly measured: boolean;
+  /** Only used while `measured` is true. */
   readonly dimensions: readonly DimensionDraft[];
   readonly discountPercent: string;
 }
@@ -63,7 +73,9 @@ export const emptyDimensionDraft = (key: string): DimensionDraft => ({
   widthInches: '',
 });
 
-export const isMeasured = (unitCode: UnitCode): boolean => unitFor(unitCode).entry === 'dimensions';
+/** Whether this unit can be measured length by width at all. Stone can. */
+export const canMeasure = (unitCode: UnitCode): boolean =>
+  unitFor(unitCode).entry === 'dimensions';
 
 /** One measured piece, or null while it is still being typed. */
 export function toDimension(draft: DimensionDraft): Dimension | null {
@@ -134,8 +146,28 @@ export function lineFromProduct(product: Product, key: string): BillLineDraft {
     rate: product.salePrice,
     taxRateBps: product.taxRateBps,
     quantity: '',
-    dimensions: isMeasured(product.unitCode) ? [emptyDimensionDraft(`${key}-d1`)] : [],
+    // Typing the total is the common case, including for stone. Measuring is
+    // a deliberate switch, taken when the pieces are being cut and checked.
+    measured: false,
+    dimensions: [],
     discountPercent: '',
+  };
+}
+
+/** Switches a line between typing a total and measuring pieces. */
+export function withMeasuring(line: BillLineDraft, measured: boolean, key: string): BillLineDraft {
+  if (measured === line.measured) return line;
+  return {
+    ...line,
+    measured,
+    // Keep whichever entry is now hidden empty, so a stale figure from the
+    // other mode can never end up on the bill.
+    quantity: measured ? '' : line.quantity,
+    dimensions: measured
+      ? line.dimensions.length > 0
+        ? line.dimensions
+        : [emptyDimensionDraft(key)]
+      : [],
   };
 }
 
@@ -146,7 +178,7 @@ function lineDiscountBps(raw: string): number | null {
 
 /** The quantity a line currently reads as, however its unit is entered. */
 export function toQuantity(line: BillLineDraft): Quantity | null {
-  if (isMeasured(line.unitCode)) {
+  if (line.measured) {
     const pieces = readableDimensions(line);
     return pieces.length === 0 ? null : Quantity.fromDimensions(pieces);
   }
@@ -174,32 +206,48 @@ export function toLineItem(line: BillLineDraft): LineItemInput | null {
 }
 
 /**
+ * Anything entered line by line against a bill-level discount. A bill and a
+ * quotation are typed the same way and must price identically, so everything
+ * below works on this rather than on the bill draft alone.
+ */
+export interface LinedDraft {
+  readonly lines: readonly BillLineDraft[];
+}
+
+/**
  * The lines that currently read, for the running total. A half-typed line is
  * left out rather than counted as zero, so the figure on screen is always a
  * total of real lines.
  */
-export function readableLines(draft: BillDraft): LineItemInput[] {
+export function readableLines(draft: LinedDraft): LineItemInput[] {
   return draft.lines.map(toLineItem).filter((line): line is LineItemInput => line !== null);
 }
 
 /** The bill-level discount as typed, for the running total. */
-export function readableBillDiscount(draft: BillDraft): Money {
-  if (draft.billDiscount.trim().length === 0) return Money.zero;
-  return parseMoney(draft.billDiscount) ?? Money.zero;
+export function readableBillDiscount(raw: string): Money {
+  if (raw.trim().length === 0) return Money.zero;
+  return parseMoney(raw) ?? Money.zero;
 }
 
-export function validateBill(draft: BillDraft): Result<ValidatedBill, BillErrors> {
-  const lines: Record<string, string> = {};
+export interface ValidatedLines {
+  /** Keyed by line, so each row can show its own complaint. */
+  readonly errors: Readonly<Record<string, string>>;
+  readonly parsed: readonly LineItemInput[];
+}
+
+/** Every line checked, and the ones that read collected. */
+export function validateLines(drafts: readonly BillLineDraft[]): ValidatedLines {
+  const errors: Record<string, string> = {};
   const parsed: LineItemInput[] = [];
 
-  for (const line of draft.lines) {
-    if (isMeasured(line.unitCode)) {
+  for (const line of drafts) {
+    if (line.measured) {
       if (readableDimensions(line).length === 0) {
-        lines[line.key] = 'Measure at least one piece, length by width.';
+        errors[line.key] = 'Measure at least one piece, length by width.';
         continue;
       }
       if (lineDiscountBps(line.discountPercent) === null) {
-        lines[line.key] = 'Enter the discount as a percentage, for example 5.';
+        errors[line.key] = 'Enter the discount as a percentage, for example 5.';
         continue;
       }
       const measured = toLineItem(line);
@@ -209,15 +257,15 @@ export function validateBill(draft: BillDraft): Result<ValidatedBill, BillErrors
 
     const amount = parseUnitAmount(line.quantity, unitFor(line.unitCode));
     if (amount === null) {
-      lines[line.key] = 'Enter a quantity.';
+      errors[line.key] = 'Enter a quantity.';
       continue;
     }
     if (amount <= 0) {
-      lines[line.key] = 'Quantity must be more than zero.';
+      errors[line.key] = 'Quantity must be more than zero.';
       continue;
     }
     if (lineDiscountBps(line.discountPercent) === null) {
-      lines[line.key] = 'Enter the discount as a percentage, for example 5.';
+      errors[line.key] = 'Enter the discount as a percentage, for example 5.';
       continue;
     }
 
@@ -225,14 +273,21 @@ export function validateBill(draft: BillDraft): Result<ValidatedBill, BillErrors
     if (item) parsed.push(item);
   }
 
-  let billDiscount = Money.zero;
-  if (draft.billDiscount.trim().length > 0) {
-    const parsedDiscount = parseMoney(draft.billDiscount);
-    if (parsedDiscount === null) {
-      return err({ lines, billDiscount: 'Enter the discount in rupees.' });
-    }
-    billDiscount = parsedDiscount;
-  }
+  return { errors, parsed };
+}
+
+/** The lump sum off the bottom, or a message saying why it will not read. */
+export function validateBillDiscount(raw: string): Result<Money, string> {
+  if (raw.trim().length === 0) return ok(Money.zero);
+  const parsed = parseMoney(raw);
+  return parsed === null ? err('Enter the discount in rupees.') : ok(parsed);
+}
+
+export function validateBill(draft: BillDraft): Result<ValidatedBill, BillErrors> {
+  const { errors: lines, parsed } = validateLines(draft.lines);
+
+  const discount = validateBillDiscount(draft.billDiscount);
+  if (!discount.ok) return err({ lines, billDiscount: discount.error });
 
   let paid = Money.zero;
   if (draft.paid.trim().length > 0) {
@@ -249,5 +304,10 @@ export function validateBill(draft: BillDraft): Result<ValidatedBill, BillErrors
   }
 
   const notes = draft.notes.trim();
-  return ok({ lines: parsed, billDiscount, paid, notes: notes.length > 0 ? notes : null });
+  return ok({
+    lines: parsed,
+    billDiscount: discount.value,
+    paid,
+    notes: notes.length > 0 ? notes : null,
+  });
 }

@@ -5,6 +5,7 @@ const shop = {
   id: 'shop-1',
   name: 'Gupta Hardware',
   address: null,
+  phone: null,
   gstin: null,
   invoicePrefix: 'GH',
 };

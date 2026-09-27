@@ -15,7 +15,7 @@ export function LaunchScreen({ message }: { message?: string }) {
     <View style={styles.screen}>
       <View style={styles.centre}>
         <BrandMark size={84} />
-        <Text style={styles.name}>Gupta Hardware</Text>
+        <Text style={styles.name}>Gupta Home Solutions</Text>
         <Text style={styles.tagline}>Billing and stock</Text>
       </View>
 

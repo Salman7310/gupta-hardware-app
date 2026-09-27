@@ -1,33 +1,27 @@
 import React, { useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { Money, unitFor } from '../../core';
+import { KeyboardAvoidingView, Modal, Platform, ScrollView, Text, View } from 'react-native';
 import { Invoice } from '../../models/invoice';
-import { Product } from '../../models/product';
-import { BillLineDraft, DimensionField, isMeasured, toQuantity } from '../../services/bill';
 import { CustomerPicker } from '../components/CustomerPicker';
-import { DimensionEntry } from '../components/DimensionEntry';
-import { useBillViewModel } from '../../viewmodels/useBillViewModel';
-import { useProductPickerViewModel } from '../../viewmodels/useProductPickerViewModel';
-import { card, elevation, radius, size, space, theme, type } from '../theme';
+import {
+  AddItem,
+  CustomerCard,
+  EntryField,
+  LineEntryRow,
+  SaveBar,
+  TotalRow,
+  entryStyles as styles,
+} from '../components/LineEntry';
+import { ProductPicker } from '../components/ProductPicker';
+import { BillStart, useBillViewModel } from '../../viewmodels/useBillViewModel';
 
 interface Props {
   readonly onSaved: (invoice: Invoice) => void;
+  /** Present when the bill was opened from a quotation the customer accepted. */
+  readonly start?: BillStart;
 }
 
-export function BillScreen({ onSaved }: Props) {
-  const vm = useBillViewModel();
+export function BillScreen({ onSaved, start }: Props) {
+  const vm = useBillViewModel(start);
   const [isPicking, setIsPicking] = useState(false);
   const [isPickingCustomer, setIsPickingCustomer] = useState(false);
 
@@ -42,20 +36,19 @@ export function BillScreen({ onSaved }: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Pressable
-          style={styles.customer}
+        {vm.startedFrom ? (
+          <Text style={styles.note}>
+            Started from quotation {vm.startedFrom.quotationNo}. Change anything the customer has
+            changed their mind about — nothing is charged until this is saved.
+          </Text>
+        ) : null}
+
+        <CustomerCard
+          customer={vm.customer}
+          label="Customer"
+          emptyLabel="Walk-in"
           onPress={() => setIsPickingCustomer(true)}
-          accessibilityRole="button"
-        >
-          <View style={styles.flex}>
-            <Text style={styles.customerLabel}>Customer</Text>
-            <Text style={styles.customerName}>{vm.customer ? vm.customer.name : 'Walk-in'}</Text>
-            {vm.customer?.gstin ? (
-              <Text style={styles.customerMeta}>GSTIN {vm.customer.gstin}</Text>
-            ) : null}
-          </View>
-          <Text style={styles.customerAction}>{vm.customer ? 'Change' : 'Choose'}</Text>
-        </Pressable>
+        />
 
         {vm.isEmpty ? (
           <Text style={styles.empty}>
@@ -63,7 +56,7 @@ export function BillScreen({ onSaved }: Props) {
           </Text>
         ) : (
           vm.draft.lines.map((line) => (
-            <LineRow
+            <LineEntryRow
               key={line.key}
               line={line}
               total={vm.lineTotals[line.key]?.total ?? null}
@@ -75,19 +68,14 @@ export function BillScreen({ onSaved }: Props) {
               }
               onAddDimension={() => vm.addDimension(line.key)}
               onRemoveDimension={(dimensionKey) => vm.removeDimension(line.key, dimensionKey)}
+              onToggleMeasuring={(measured) => vm.setMeasuring(line.key, measured)}
             />
           ))
         )}
 
-        <Pressable
-          style={styles.addItem}
-          onPress={() => setIsPicking(true)}
-          accessibilityRole="button"
-        >
-          <Text style={styles.addItemLabel}>+ Add item</Text>
-        </Pressable>
+        <AddItem onPress={() => setIsPicking(true)} />
 
-        <Field
+        <EntryField
           label="Discount on the whole bill"
           value={vm.draft.billDiscount}
           onChange={vm.setBillDiscount}
@@ -97,7 +85,7 @@ export function BillScreen({ onSaved }: Props) {
           hint="Spread across the items before GST, so the tax stays right"
         />
 
-        <Field
+        <EntryField
           label="Amount paid"
           value={vm.draft.paid}
           onChange={vm.setPaid}
@@ -123,18 +111,11 @@ export function BillScreen({ onSaved }: Props) {
         {vm.errors.form ? <Text style={styles.formError}>{vm.errors.form}</Text> : null}
       </ScrollView>
 
-      <View style={styles.saveBar}>
-        <Pressable
-          style={({ pressed }) => [styles.save, pressed && styles.savePressed]}
-          onPress={() => void submit()}
-          disabled={vm.isSaving}
-          accessibilityRole="button"
-        >
-          <Text style={styles.saveLabel}>
-            {vm.isSaving ? 'Saving…' : `Save bill · ${vm.totals.grandTotal.format()}`}
-          </Text>
-        </Pressable>
-      </View>
+      <SaveBar
+        label={vm.isSaving ? 'Saving…' : `Save bill · ${vm.totals.grandTotal.format()}`}
+        onPress={() => void submit()}
+        disabled={vm.isSaving}
+      />
 
       <Modal
         visible={isPickingCustomer}
@@ -162,310 +143,3 @@ export function BillScreen({ onSaved }: Props) {
     </KeyboardAvoidingView>
   );
 }
-
-function LineRow({
-  line,
-  total,
-  error,
-  onChange,
-  onRemove,
-  onDimensionChange,
-  onAddDimension,
-  onRemoveDimension,
-}: {
-  line: BillLineDraft;
-  total: Money | null;
-  error?: string;
-  onChange: (field: 'quantity' | 'discountPercent', value: string) => void;
-  onRemove: () => void;
-  onDimensionChange: (dimensionKey: string, field: DimensionField, value: string) => void;
-  onAddDimension: () => void;
-  onRemoveDimension: (dimensionKey: string) => void;
-}) {
-  const unit = unitFor(line.unitCode);
-  const measured = isMeasured(line.unitCode);
-
-  return (
-    <View style={styles.line}>
-      <View style={styles.lineHead}>
-        <View style={styles.flex}>
-          <Text style={styles.lineName}>{line.name}</Text>
-          <Text style={styles.lineRate}>
-            {line.rate.format()}/{unit.label}
-          </Text>
-        </View>
-        <Pressable onPress={onRemove} accessibilityRole="button" hitSlop={12}>
-          <Text style={styles.remove}>Remove</Text>
-        </Pressable>
-      </View>
-
-      {measured ? (
-        <DimensionEntry
-          dimensions={line.dimensions}
-          area={toQuantity(line)}
-          onChange={onDimensionChange}
-          onAdd={onAddDimension}
-          onRemove={onRemoveDimension}
-        />
-      ) : null}
-
-      <View style={styles.lineInputs}>
-        {measured ? null : (
-          <View style={styles.flex}>
-            <Text style={styles.smallLabel}>Quantity</Text>
-            <View style={styles.inputBox}>
-              <TextInput
-                style={styles.input}
-                value={line.quantity}
-                onChangeText={(v) => onChange('quantity', v)}
-                keyboardType="decimal-pad"
-                placeholder="0"
-                placeholderTextColor={theme.textPlaceholder}
-              />
-              <Text style={styles.affix}>{unit.label}</Text>
-            </View>
-          </View>
-        )}
-
-        <View style={styles.flex}>
-          <Text style={styles.smallLabel}>Discount</Text>
-          <View style={styles.inputBox}>
-            <TextInput
-              style={styles.input}
-              value={line.discountPercent}
-              onChangeText={(v) => onChange('discountPercent', v)}
-              keyboardType="decimal-pad"
-              placeholder="0"
-              placeholderTextColor={theme.textPlaceholder}
-            />
-            <Text style={styles.affix}>%</Text>
-          </View>
-        </View>
-
-        <View style={styles.lineTotal}>
-          <Text style={styles.smallLabel}>Line total</Text>
-          <Text style={styles.lineTotalValue}>{total ? total.format() : '—'}</Text>
-        </View>
-      </View>
-
-      {error ? <Text style={styles.lineError}>{error}</Text> : null}
-    </View>
-  );
-}
-
-function TotalRow({ label, value, emphasis }: { label: string; value: Money; emphasis?: boolean }) {
-  return (
-    <View style={styles.totalRow}>
-      <Text style={[styles.totalLabel, emphasis && styles.totalStrong]}>{label}</Text>
-      <Text style={[styles.totalValue, emphasis && styles.totalStrong]}>{value.format()}</Text>
-    </View>
-  );
-}
-
-function ProductPicker({
-  onPick,
-  onClose,
-}: {
-  onPick: (product: Product) => void;
-  onClose: () => void;
-}) {
-  const picker = useProductPickerViewModel();
-
-  return (
-    <View style={styles.picker}>
-      <View style={styles.pickerHead}>
-        <Text style={styles.pickerTitle}>Add an item</Text>
-        <Pressable onPress={onClose} accessibilityRole="button" hitSlop={12}>
-          <Text style={styles.remove}>Close</Text>
-        </Pressable>
-      </View>
-
-      <TextInput
-        style={styles.search}
-        value={picker.query}
-        onChangeText={picker.setQuery}
-        placeholder="Search products"
-        placeholderTextColor={theme.textPlaceholder}
-        autoCorrect={false}
-        autoFocus
-      />
-
-      {picker.isLoading ? <ActivityIndicator style={styles.state} /> : null}
-      {picker.hasNoResults ? (
-        <Text style={styles.state}>No product matches that search.</Text>
-      ) : null}
-
-      <FlatList
-        data={picker.items}
-        keyExtractor={(item) => item.id}
-        keyboardShouldPersistTaps="handled"
-        renderItem={({ item }) => (
-          <Pressable style={styles.pickRow} onPress={() => onPick(item)} accessibilityRole="button">
-            <Text style={styles.pickName}>{item.name}</Text>
-            <Text style={styles.pickRate}>
-              {item.salePrice.format()}/{unitFor(item.unitCode).label}
-            </Text>
-          </Pressable>
-        )}
-      />
-    </View>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
-  prefix,
-  hint,
-  error,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  prefix?: string;
-  hint?: string;
-  error?: string;
-}) {
-  return (
-    <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
-      <View style={styles.inputBox}>
-        {prefix ? <Text style={styles.affix}>{prefix}</Text> : null}
-        <TextInput
-          style={styles.input}
-          value={value}
-          onChangeText={onChange}
-          keyboardType="decimal-pad"
-          placeholder={placeholder}
-          placeholderTextColor={theme.textPlaceholder}
-        />
-      </View>
-      {hint && !error ? <Text style={styles.hint}>{hint}</Text> : null}
-      {error ? <Text style={styles.lineError}>{error}</Text> : null}
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: theme.background },
-  content: { padding: space.lg, paddingBottom: space.huge, gap: space.lg },
-  empty: {
-    ...type.body,
-    color: theme.textMuted,
-    lineHeight: 24,
-    textAlign: 'center',
-    paddingHorizontal: space.lg,
-    paddingTop: space.lg,
-  },
-
-  customer: {
-    ...card,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.md,
-    padding: space.lg,
-    minHeight: size.tap,
-  },
-  customerLabel: { ...type.micro, color: theme.textMuted },
-  customerName: { ...type.bodyStrong, color: theme.text, marginTop: 2 },
-  customerMeta: { ...type.micro, color: theme.textMuted, marginTop: 2 },
-  customerAction: { ...type.label, color: theme.accentInk },
-
-  line: { ...card, padding: space.lg, gap: space.md },
-  lineHead: { flexDirection: 'row', alignItems: 'flex-start', gap: space.md },
-  lineName: { ...type.bodyStrong, color: theme.text },
-  lineRate: { ...type.caption, color: theme.textMuted, marginTop: 2 },
-  remove: { ...type.label, color: theme.accentInk },
-  lineInputs: { flexDirection: 'row', alignItems: 'flex-end', gap: space.md },
-  lineTotal: { flex: 1, alignItems: 'flex-end' },
-  lineTotalValue: { ...type.bodyStrong, color: theme.text, paddingVertical: space.md },
-  lineError: { ...type.caption, color: theme.danger },
-
-  smallLabel: { ...type.micro, color: theme.textLabel, marginBottom: space.xs },
-  inputBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.surface,
-    borderWidth: 1,
-    borderColor: theme.border,
-    borderRadius: radius.md,
-    paddingHorizontal: space.md,
-    minHeight: size.tap,
-  },
-  input: { flex: 1, ...type.body, color: theme.text, paddingVertical: space.md },
-  affix: { ...type.caption, color: theme.textMuted },
-
-  addItem: {
-    height: size.tap,
-    justifyContent: 'center',
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: theme.borderStrong,
-    alignItems: 'center',
-    backgroundColor: theme.surface,
-  },
-  addItemLabel: { ...type.label, color: theme.accentInk },
-
-  field: { gap: space.sm },
-  label: { ...type.label, color: theme.textLabel },
-  hint: { ...type.micro, color: theme.textMuted, lineHeight: 18 },
-
-  totals: { ...card, padding: space.lg, gap: space.md },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  totalLabel: { ...type.caption, color: theme.textMuted },
-  totalValue: { ...type.caption, color: theme.text },
-  totalStrong: { ...type.title, color: theme.text },
-  formError: { ...type.body, color: theme.danger, textAlign: 'center' },
-
-  saveBar: {
-    padding: space.lg,
-    backgroundColor: theme.surface,
-    ...elevation.raised,
-  },
-  save: {
-    backgroundColor: theme.accent,
-    borderRadius: radius.md,
-    height: size.control,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  savePressed: { backgroundColor: theme.accentPressed },
-  saveLabel: { ...type.bodyStrong, color: theme.accentText },
-
-  picker: { flex: 1, backgroundColor: theme.background, paddingTop: space.lg },
-  pickerHead: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: space.lg,
-  },
-  pickerTitle: { ...type.title, color: theme.text },
-  search: {
-    margin: space.lg,
-    paddingHorizontal: space.lg,
-    height: size.tap,
-    ...type.body,
-    color: theme.text,
-    backgroundColor: theme.surface,
-    borderRadius: radius.md,
-    ...elevation.card,
-  },
-  state: { marginTop: space.xxl, textAlign: 'center', ...type.body, color: theme.textMuted },
-  pickRow: {
-    paddingHorizontal: space.lg,
-    minHeight: size.tap,
-    paddingVertical: space.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: space.md,
-  },
-  pickName: { flex: 1, ...type.body, color: theme.text },
-  pickRate: { ...type.caption, color: theme.textMuted },
-});

@@ -8,6 +8,7 @@ import {
   readableLines,
   toQuantity,
   validateBill,
+  withMeasuring,
 } from '../bill';
 import { aProduct } from '../../testing/builders';
 
@@ -68,9 +69,9 @@ describe('a bill being typed', () => {
   });
 
   it('treats an unreadable bill discount as nothing while it is being typed', () => {
-    expect(readableBillDiscount(draftWith({ billDiscount: '' })).isZero()).toBe(true);
-    expect(readableBillDiscount(draftWith({ billDiscount: 'abc' })).isZero()).toBe(true);
-    expect(readableBillDiscount(draftWith({ billDiscount: '100' })).paise).toBe(10_000);
+    expect(readableBillDiscount('').isZero()).toBe(true);
+    expect(readableBillDiscount('abc').isZero()).toBe(true);
+    expect(readableBillDiscount('100').paise).toBe(10_000);
   });
 });
 
@@ -137,17 +138,83 @@ const piece = (over: Partial<DimensionDraft> = {}): DimensionDraft => ({
 
 const stoneLine = (dimensions: DimensionDraft[]) => ({
   ...lineFromProduct(marble, 'k1'),
+  measured: true,
   dimensions,
 });
 
-describe('measuring stone by length and width', () => {
-  it('starts a stone line with one measurement waiting', () => {
+/**
+ * The shop asked for this after the first demo: most of the time they already
+ * know the area — the slab is labelled, or it was worked out from the
+ * customer's plan — and typing it is three taps against twelve.
+ */
+describe('entering stone as a plain area', () => {
+  it('starts a stone line ready for a typed total, not a measurement', () => {
     const line = lineFromProduct(marble, 'k1');
 
-    expect(line.dimensions).toHaveLength(1);
-    expect(line.dimensions[0].pieces).toBe('1');
+    expect(line.measured).toBe(false);
+    expect(line.dimensions).toHaveLength(0);
   });
 
+  it('reads a typed area into whole square inches', () => {
+    const line = { ...lineFromProduct(marble, 'k1'), quantity: '24.75' };
+
+    expect(toQuantity(line)?.amount).toBe(3_564);
+    expect(toQuantity(line)?.toDisplay()).toBe('24.75 sq ft');
+  });
+
+  it('prints no measurement working, because none was taken', () => {
+    const line = { ...lineFromProduct(marble, 'k1'), quantity: '24.75' };
+    expect(toQuantity(line)?.describeWorking()).toBeNull();
+  });
+
+  it('saves from a typed area alone', () => {
+    const line = { ...lineFromProduct(marble, 'k1'), quantity: '120' };
+    const result = validateBill(draftWith({ lines: [line] }));
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.lines[0].quantity.amount).toBe(120 * 144);
+  });
+
+  it('asks for a quantity when the area is blank', () => {
+    const result = validateBill(draftWith({ lines: [lineFromProduct(marble, 'k1')] }));
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.lines.k1).toBe('Enter a quantity.');
+  });
+});
+
+describe('switching a stone line between a total and measured pieces', () => {
+  it('gives the line one empty piece to measure', () => {
+    const switched = withMeasuring(lineFromProduct(marble, 'k1'), true, 'd1');
+
+    expect(switched.measured).toBe(true);
+    expect(switched.dimensions).toHaveLength(1);
+    expect(switched.dimensions[0].pieces).toBe('1');
+  });
+
+  /** A figure left behind in the hidden box must never reach the bill. */
+  it('drops the typed total when it starts measuring', () => {
+    const typed = { ...lineFromProduct(marble, 'k1'), quantity: '24.75' };
+    expect(withMeasuring(typed, true, 'd1').quantity).toBe('');
+  });
+
+  it('drops the measurements when it goes back to a total', () => {
+    const measured = stoneLine([piece({ lengthFeet: '6', widthFeet: '2' })]);
+    const back = withMeasuring(measured, false, 'd2');
+
+    expect(back.measured).toBe(false);
+    expect(back.dimensions).toHaveLength(0);
+  });
+
+  it('keeps pieces already measured when switching back and forth', () => {
+    const measured = stoneLine([piece({ lengthFeet: '6', widthFeet: '2' })]);
+    expect(withMeasuring(measured, true, 'd2').dimensions).toHaveLength(1);
+  });
+});
+
+describe('measuring stone by length and width', () => {
   it('gives a tile line nothing to measure', () => {
     expect(lineFromProduct(tile, 'k1').dimensions).toHaveLength(0);
   });

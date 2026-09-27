@@ -9,6 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Customer } from '../../models/customer';
 import { CustomerField } from '../../services/customer';
 import { useCustomerPickerViewModel } from '../../viewmodels/useCustomerPickerViewModel';
@@ -17,10 +18,24 @@ import { card, radius, size, space, theme, type } from '../theme';
 interface Props {
   readonly onPick: (customer: Customer | null) => void;
   readonly onClose: () => void;
+  /** The wording differs between a bill and a quotation; the picker does not. */
+  readonly title?: string;
+  readonly anonymousLabel?: string;
+  readonly anonymousHint?: string;
 }
 
-export function CustomerPicker({ onPick, onClose }: Props) {
+export function CustomerPicker({
+  onPick,
+  onClose,
+  title = 'Who is this bill for?',
+  anonymousLabel = 'Walk-in customer',
+  anonymousHint = 'No name on the bill',
+}: Props) {
   const vm = useCustomerPickerViewModel();
+  // Shown in a bare Modal, which sits outside the navigator that would normally
+  // keep the header clear of the status bar and camera cutout.
+  const insets = useSafeAreaInsets();
+  const screen = [styles.screen, { paddingTop: insets.top + space.lg }];
 
   const add = async () => {
     const created = await vm.create();
@@ -29,7 +44,7 @@ export function CustomerPicker({ onPick, onClose }: Props) {
 
   if (vm.isAdding) {
     return (
-      <View style={styles.screen}>
+      <View style={screen}>
         <Header title="New customer" actionLabel="Cancel" onAction={vm.cancelAdding} />
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
           <Field
@@ -41,12 +56,13 @@ export function CustomerPicker({ onPick, onClose }: Props) {
             autoFocus
           />
           <Field
-            label="Phone"
+            label="Mobile"
             value={vm.draft.phone}
             onChange={(v) => vm.setField('phone', v)}
-            placeholder="Optional"
+            placeholder="98765 43210"
             keyboard="phone-pad"
             error={vm.errors.phone}
+            hint="Printed on the bill, and how you find them again"
           />
           <Field
             label="GSTIN"
@@ -81,8 +97,8 @@ export function CustomerPicker({ onPick, onClose }: Props) {
   }
 
   return (
-    <View style={styles.screen}>
-      <Header title="Who is this bill for?" actionLabel="Close" onAction={onClose} />
+    <View style={screen}>
+      <Header title={title} actionLabel="Close" onAction={onClose} />
 
       <TextInput
         style={styles.search}
@@ -94,9 +110,22 @@ export function CustomerPicker({ onPick, onClose }: Props) {
         autoFocus
       />
 
+      {/*
+        Adding sits above the book rather than under it. Most people at the
+        counter are not in the book yet, and the shop asked for a name and a
+        mobile to reach the bill, so that has to be the first thing offered.
+      */}
+      <Pressable style={styles.addNew} onPress={vm.startAdding} accessibilityRole="button">
+        <Text style={styles.addNewLabel}>
+          {vm.query.trim().length > 0
+            ? `+ Add "${vm.query.trim()}"`
+            : '+ Add a new customer — name and mobile'}
+        </Text>
+      </Pressable>
+
       <Pressable style={styles.walkIn} onPress={() => onPick(null)} accessibilityRole="button">
-        <Text style={styles.walkInLabel}>Walk-in customer</Text>
-        <Text style={styles.walkInHint}>No name on the bill</Text>
+        <Text style={styles.walkInLabel}>{anonymousLabel}</Text>
+        <Text style={styles.walkInHint}>{anonymousHint}</Text>
       </Pressable>
 
       {vm.isLoading ? <ActivityIndicator style={styles.state} /> : null}
@@ -118,13 +147,6 @@ export function CustomerPicker({ onPick, onClose }: Props) {
             </View>
           </Pressable>
         )}
-        ListFooterComponent={
-          <Pressable style={styles.addNew} onPress={vm.startAdding} accessibilityRole="button">
-            <Text style={styles.addNewLabel}>
-              {vm.query.trim().length > 0 ? `+ Add "${vm.query.trim()}"` : '+ Add a new customer'}
-            </Text>
-          </Pressable>
-        }
       />
     </View>
   );
@@ -192,7 +214,7 @@ function Field({
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  screen: { flex: 1, backgroundColor: theme.background, paddingTop: space.lg },
+  screen: { flex: 1, backgroundColor: theme.background },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',

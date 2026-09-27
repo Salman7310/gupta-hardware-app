@@ -5,3 +5,4 @@ export * from './unit';
 export * from './quantity';
 export * from './parse';
 export * from './id';
+export * from './date';

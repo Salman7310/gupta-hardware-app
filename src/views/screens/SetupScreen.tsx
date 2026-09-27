@@ -21,11 +21,14 @@ interface Props {
 export function SetupScreen({ onSubmit, isSubmitting, error }: Props) {
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
+  const [phone, setPhone] = useState('');
   const [gstin, setGstin] = useState('');
-  const [invoicePrefix, setInvoicePrefix] = useState('');
+  // Required, so it starts with a value rather than a grey hint that
+  // looks like one. Setup refused the first attempt otherwise.
+  const [invoicePrefix, setInvoicePrefix] = useState('GH');
   const [deviceLetter, setDeviceLetter] = useState('A');
 
-  const submit = () => onSubmit({ name, address, gstin, invoicePrefix, deviceLetter });
+  const submit = () => onSubmit({ name, address, phone, gstin, invoicePrefix, deviceLetter });
 
   return (
     <KeyboardAvoidingView
@@ -45,6 +48,13 @@ export function SetupScreen({ onSubmit, isSubmitting, error }: Props) {
           onChange={setAddress}
           placeholder="Shop address"
           multiline
+        />
+        <Field
+          label="Mobile"
+          value={phone}
+          onChange={setPhone}
+          placeholder="98765 43210"
+          keyboard="phone-pad"
         />
         <Field
           label="GSTIN"
@@ -93,6 +103,7 @@ function Field({
   hint,
   multiline,
   autoCapitalize,
+  keyboard,
 }: {
   label: string;
   value: string;
@@ -101,6 +112,7 @@ function Field({
   hint?: string;
   multiline?: boolean;
   autoCapitalize?: 'none' | 'characters' | 'words' | 'sentences';
+  keyboard?: 'default' | 'phone-pad';
 }) {
   return (
     <View style={styles.field}>
@@ -113,6 +125,7 @@ function Field({
         placeholderTextColor="#8d8d86"
         multiline={multiline}
         autoCapitalize={autoCapitalize}
+        keyboardType={keyboard}
         autoCorrect={false}
       />
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}

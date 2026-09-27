@@ -9,6 +9,12 @@ export interface InvoiceListItem {
   readonly invoice: Invoice;
   readonly state: PaymentState;
   readonly due: Money;
+  /**
+   * Null for a walk-in. Shown beside the bill number because that is how the
+   * shop looks a bill up — "what did I charge Mahesh on Tuesday" — and a list
+   * of numbers alone makes them open bills one by one to find it.
+   */
+  readonly customerName: string | null;
 }
 
 export interface InvoiceListViewModel {
@@ -25,7 +31,7 @@ export interface InvoiceListViewModel {
  * saved bill could not be seen again at all.
  */
 export function useInvoiceListViewModel(): InvoiceListViewModel {
-  const { invoiceRepository } = useContainer();
+  const { invoiceRepository, customerRepository } = useContainer();
   const [items, setItems] = useState<readonly InvoiceListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,11 +44,20 @@ export function useInvoiceListViewModel(): InvoiceListViewModel {
       try {
         const invoices = await invoiceRepository.listRecent(RECENT_LIMIT);
         if (cancelled) return;
+
+        // One read of the book rather than one per bill. A shop has far fewer
+        // customers than bills, and the alternative is fifty round trips to
+        // draw one screen.
+        const book = await customerRepository.list();
+        if (cancelled) return;
+        const names = new Map(book.map((c) => [c.id, c.name]));
+
         setItems(
           invoices.map((invoice) => ({
             invoice,
             state: paymentState(invoice),
             due: amountDue(invoice),
+            customerName: invoice.customerId ? (names.get(invoice.customerId) ?? null) : null,
           })),
         );
         setError(null);
@@ -57,7 +72,7 @@ export function useInvoiceListViewModel(): InvoiceListViewModel {
     return () => {
       cancelled = true;
     };
-  }, [invoiceRepository, reloadToken]);
+  }, [invoiceRepository, customerRepository, reloadToken]);
 
   const refresh = useCallback(() => setReloadToken((n) => n + 1), []);
 

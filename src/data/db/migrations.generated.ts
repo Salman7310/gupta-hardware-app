@@ -15,40 +15,53 @@ interface Journal {
 }
 
 const journal: Journal = {
-  version: '7',
-  dialect: 'sqlite',
-  entries: [
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
     {
-      idx: 0,
-      version: '6',
-      when: 1790101830451,
-      tag: '0000_public_cargill',
-      breakpoints: true,
+      "idx": 0,
+      "version": "6",
+      "when": 1790101830451,
+      "tag": "0000_public_cargill",
+      "breakpoints": true
     },
     {
-      idx: 1,
-      version: '6',
-      when: 1790103833382,
-      tag: '0001_lean_praxagora',
-      breakpoints: true,
+      "idx": 1,
+      "version": "6",
+      "when": 1790103833382,
+      "tag": "0001_lean_praxagora",
+      "breakpoints": true
     },
     {
-      idx: 2,
-      version: '6',
-      when: 1790143613861,
-      tag: '0002_tearful_mentallo',
-      breakpoints: true,
+      "idx": 2,
+      "version": "6",
+      "when": 1790143613861,
+      "tag": "0002_tearful_mentallo",
+      "breakpoints": true
     },
-  ],
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1790228321507,
+      "tag": "0003_tiresome_domino",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1790248251030,
+      "tag": "0004_sparkling_kylun",
+      "breakpoints": true
+    }
+  ]
 };
 
 const migrations: Record<string, string> = {
-  m0000:
-    'CREATE TABLE `customers` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`name` text NOT NULL,\n\t`phone` text,\n\t`address` text,\n\t`gstin` text,\n\t`shop_id` text NOT NULL,\n\t`device_id` text NOT NULL,\n\t`updated_at` integer NOT NULL,\n\t`deleted_at` integer\n);\n--> statement-breakpoint\nCREATE INDEX `customers_shop_name_idx` ON `customers` (`shop_id`,`name`);--> statement-breakpoint\nCREATE TABLE `invoice_items` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`invoice_id` text NOT NULL,\n\t`product_id` text,\n\t`name_snapshot` text NOT NULL,\n\t`rate_paise` integer NOT NULL,\n\t`tax_rate_bps` integer DEFAULT 0 NOT NULL,\n\t`discount_bps` integer DEFAULT 0 NOT NULL,\n\t`quantity_amount` integer NOT NULL,\n\t`unit_code` text NOT NULL,\n\t`dimensions_json` text,\n\t`line_paise` integer NOT NULL,\n\t`shop_id` text NOT NULL,\n\t`device_id` text NOT NULL,\n\t`updated_at` integer NOT NULL,\n\t`deleted_at` integer\n);\n--> statement-breakpoint\nCREATE INDEX `invoice_items_invoice_idx` ON `invoice_items` (`invoice_id`);--> statement-breakpoint\nCREATE TABLE `invoices` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`invoice_no` text NOT NULL,\n\t`customer_id` text,\n\t`issued_at` integer NOT NULL,\n\t`subtotal_paise` integer NOT NULL,\n\t`discount_paise` integer DEFAULT 0 NOT NULL,\n\t`taxable_paise` integer NOT NULL,\n\t`cgst_paise` integer DEFAULT 0 NOT NULL,\n\t`sgst_paise` integer DEFAULT 0 NOT NULL,\n\t`round_off_paise` integer DEFAULT 0 NOT NULL,\n\t`grand_total_paise` integer NOT NULL,\n\t`paid_paise` integer DEFAULT 0 NOT NULL,\n\t`notes` text,\n\t`shop_id` text NOT NULL,\n\t`device_id` text NOT NULL,\n\t`updated_at` integer NOT NULL,\n\t`deleted_at` integer\n);\n--> statement-breakpoint\nCREATE INDEX `invoices_shop_issued_idx` ON `invoices` (`shop_id`,`issued_at`);--> statement-breakpoint\nCREATE TABLE `products` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`name` text NOT NULL,\n\t`category` text NOT NULL,\n\t`unit_code` text NOT NULL,\n\t`sale_price_paise` integer NOT NULL,\n\t`purchase_price_paise` integer DEFAULT 0 NOT NULL,\n\t`tax_rate_bps` integer DEFAULT 0 NOT NULL,\n\t`hsn_code` text,\n\t`is_active` integer DEFAULT true NOT NULL,\n\t`shop_id` text NOT NULL,\n\t`device_id` text NOT NULL,\n\t`updated_at` integer NOT NULL,\n\t`deleted_at` integer\n);\n--> statement-breakpoint\nCREATE INDEX `products_shop_name_idx` ON `products` (`shop_id`,`name`);--> statement-breakpoint\nCREATE TABLE `settings` (\n\t`key` text PRIMARY KEY NOT NULL,\n\t`value` text NOT NULL,\n\t`shop_id` text,\n\t`device_id` text,\n\t`updated_at` integer NOT NULL,\n\t`deleted_at` integer\n);\n--> statement-breakpoint\nCREATE TABLE `stock_movements` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`product_id` text NOT NULL,\n\t`kind` text NOT NULL,\n\t`quantity_amount` integer NOT NULL,\n\t`unit_code` text NOT NULL,\n\t`ref_invoice_id` text,\n\t`occurred_at` integer NOT NULL,\n\t`note` text,\n\t`shop_id` text NOT NULL,\n\t`device_id` text NOT NULL,\n\t`updated_at` integer NOT NULL,\n\t`deleted_at` integer\n);\n--> statement-breakpoint\nCREATE INDEX `stock_movements_product_idx` ON `stock_movements` (`product_id`,`occurred_at`);',
-  m0001:
-    'ALTER TABLE `products` ADD `pieces_per_box` integer;--> statement-breakpoint\nALTER TABLE `products` ADD `box_coverage_sq_in` integer;--> statement-breakpoint\nALTER TABLE `products` ADD `min_stock` integer;--> statement-breakpoint\nALTER TABLE `products` ADD `barcode` text;',
-  m0002:
-    'ALTER TABLE `invoice_items` ADD `discount_paise` integer DEFAULT 0 NOT NULL;--> statement-breakpoint\nALTER TABLE `invoices` ADD `bill_discount_paise` integer DEFAULT 0 NOT NULL;',
+  m0000: "CREATE TABLE `customers` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`name` text NOT NULL,\n\t`phone` text,\n\t`address` text,\n\t`gstin` text,\n\t`shop_id` text NOT NULL,\n\t`device_id` text NOT NULL,\n\t`updated_at` integer NOT NULL,\n\t`deleted_at` integer\n);\n--> statement-breakpoint\nCREATE INDEX `customers_shop_name_idx` ON `customers` (`shop_id`,`name`);--> statement-breakpoint\nCREATE TABLE `invoice_items` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`invoice_id` text NOT NULL,\n\t`product_id` text,\n\t`name_snapshot` text NOT NULL,\n\t`rate_paise` integer NOT NULL,\n\t`tax_rate_bps` integer DEFAULT 0 NOT NULL,\n\t`discount_bps` integer DEFAULT 0 NOT NULL,\n\t`quantity_amount` integer NOT NULL,\n\t`unit_code` text NOT NULL,\n\t`dimensions_json` text,\n\t`line_paise` integer NOT NULL,\n\t`shop_id` text NOT NULL,\n\t`device_id` text NOT NULL,\n\t`updated_at` integer NOT NULL,\n\t`deleted_at` integer\n);\n--> statement-breakpoint\nCREATE INDEX `invoice_items_invoice_idx` ON `invoice_items` (`invoice_id`);--> statement-breakpoint\nCREATE TABLE `invoices` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`invoice_no` text NOT NULL,\n\t`customer_id` text,\n\t`issued_at` integer NOT NULL,\n\t`subtotal_paise` integer NOT NULL,\n\t`discount_paise` integer DEFAULT 0 NOT NULL,\n\t`taxable_paise` integer NOT NULL,\n\t`cgst_paise` integer DEFAULT 0 NOT NULL,\n\t`sgst_paise` integer DEFAULT 0 NOT NULL,\n\t`round_off_paise` integer DEFAULT 0 NOT NULL,\n\t`grand_total_paise` integer NOT NULL,\n\t`paid_paise` integer DEFAULT 0 NOT NULL,\n\t`notes` text,\n\t`shop_id` text NOT NULL,\n\t`device_id` text NOT NULL,\n\t`updated_at` integer NOT NULL,\n\t`deleted_at` integer\n);\n--> statement-breakpoint\nCREATE INDEX `invoices_shop_issued_idx` ON `invoices` (`shop_id`,`issued_at`);--> statement-breakpoint\nCREATE TABLE `products` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`name` text NOT NULL,\n\t`category` text NOT NULL,\n\t`unit_code` text NOT NULL,\n\t`sale_price_paise` integer NOT NULL,\n\t`purchase_price_paise` integer DEFAULT 0 NOT NULL,\n\t`tax_rate_bps` integer DEFAULT 0 NOT NULL,\n\t`hsn_code` text,\n\t`is_active` integer DEFAULT true NOT NULL,\n\t`shop_id` text NOT NULL,\n\t`device_id` text NOT NULL,\n\t`updated_at` integer NOT NULL,\n\t`deleted_at` integer\n);\n--> statement-breakpoint\nCREATE INDEX `products_shop_name_idx` ON `products` (`shop_id`,`name`);--> statement-breakpoint\nCREATE TABLE `settings` (\n\t`key` text PRIMARY KEY NOT NULL,\n\t`value` text NOT NULL,\n\t`shop_id` text,\n\t`device_id` text,\n\t`updated_at` integer NOT NULL,\n\t`deleted_at` integer\n);\n--> statement-breakpoint\nCREATE TABLE `stock_movements` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`product_id` text NOT NULL,\n\t`kind` text NOT NULL,\n\t`quantity_amount` integer NOT NULL,\n\t`unit_code` text NOT NULL,\n\t`ref_invoice_id` text,\n\t`occurred_at` integer NOT NULL,\n\t`note` text,\n\t`shop_id` text NOT NULL,\n\t`device_id` text NOT NULL,\n\t`updated_at` integer NOT NULL,\n\t`deleted_at` integer\n);\n--> statement-breakpoint\nCREATE INDEX `stock_movements_product_idx` ON `stock_movements` (`product_id`,`occurred_at`);",
+  m0001: "ALTER TABLE `products` ADD `pieces_per_box` integer;--> statement-breakpoint\nALTER TABLE `products` ADD `box_coverage_sq_in` integer;--> statement-breakpoint\nALTER TABLE `products` ADD `min_stock` integer;--> statement-breakpoint\nALTER TABLE `products` ADD `barcode` text;",
+  m0002: "ALTER TABLE `invoice_items` ADD `discount_paise` integer DEFAULT 0 NOT NULL;--> statement-breakpoint\nALTER TABLE `invoices` ADD `bill_discount_paise` integer DEFAULT 0 NOT NULL;",
+  m0003: "CREATE TABLE `payments` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`invoice_id` text NOT NULL,\n\t`amount_paise` integer NOT NULL,\n\t`method` text NOT NULL,\n\t`received_at` integer NOT NULL,\n\t`note` text,\n\t`shop_id` text NOT NULL,\n\t`device_id` text NOT NULL,\n\t`updated_at` integer NOT NULL,\n\t`deleted_at` integer\n);\n--> statement-breakpoint\nCREATE INDEX `payments_invoice_idx` ON `payments` (`invoice_id`,`received_at`);\n--> statement-breakpoint\n-- Carry forward what earlier builds recorded on the invoice row itself. Without\n-- this every already part-paid bill would read as unpaid the moment the ledger\n-- became the source of truth, and the shop would chase debts it had collected.\nINSERT INTO `payments` (`id`, `invoice_id`, `amount_paise`, `method`, `received_at`, `note`, `shop_id`, `device_id`, `updated_at`, `deleted_at`)\nSELECT lower(hex(randomblob(16))), `id`, `paid_paise`, 'other', `issued_at`, 'Carried over from before payments were recorded one by one', `shop_id`, `device_id`, `updated_at`, NULL\nFROM `invoices`\nWHERE `paid_paise` > 0 AND `deleted_at` IS NULL;\n",
+  m0004: "CREATE TABLE `quotation_items` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`quotation_id` text NOT NULL,\n\t`product_id` text,\n\t`name_snapshot` text NOT NULL,\n\t`rate_paise` integer NOT NULL,\n\t`tax_rate_bps` integer DEFAULT 0 NOT NULL,\n\t`discount_bps` integer DEFAULT 0 NOT NULL,\n\t`discount_paise` integer DEFAULT 0 NOT NULL,\n\t`quantity_amount` integer NOT NULL,\n\t`unit_code` text NOT NULL,\n\t`dimensions_json` text,\n\t`line_paise` integer NOT NULL,\n\t`shop_id` text NOT NULL,\n\t`device_id` text NOT NULL,\n\t`updated_at` integer NOT NULL,\n\t`deleted_at` integer\n);\n--> statement-breakpoint\nCREATE INDEX `quotation_items_quotation_idx` ON `quotation_items` (`quotation_id`);--> statement-breakpoint\nCREATE TABLE `quotations` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`quotation_no` text NOT NULL,\n\t`customer_id` text,\n\t`issued_at` integer NOT NULL,\n\t`valid_until` integer NOT NULL,\n\t`subtotal_paise` integer NOT NULL,\n\t`discount_paise` integer DEFAULT 0 NOT NULL,\n\t`bill_discount_paise` integer DEFAULT 0 NOT NULL,\n\t`taxable_paise` integer NOT NULL,\n\t`cgst_paise` integer DEFAULT 0 NOT NULL,\n\t`sgst_paise` integer DEFAULT 0 NOT NULL,\n\t`round_off_paise` integer DEFAULT 0 NOT NULL,\n\t`grand_total_paise` integer NOT NULL,\n\t`accepted_invoice_id` text,\n\t`notes` text,\n\t`shop_id` text NOT NULL,\n\t`device_id` text NOT NULL,\n\t`updated_at` integer NOT NULL,\n\t`deleted_at` integer\n);\n--> statement-breakpoint\nCREATE INDEX `quotations_shop_issued_idx` ON `quotations` (`shop_id`,`issued_at`);",
 };
 
 export default { journal, migrations };

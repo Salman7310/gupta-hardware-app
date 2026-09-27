@@ -1,5 +1,6 @@
 import { AppError, Id, Money, Quantity, Result, appError, err, ok } from '../core';
 import { Invoice, InvoiceItem, LineItemInput } from '../models/invoice';
+import { Payment } from '../models/payment';
 import { StockMovement } from '../models/stock-movement';
 import { calculateBill } from './bill-calculator';
 import { Identity } from './identity';
@@ -126,8 +127,25 @@ export class CreateInvoice {
       items,
     };
 
+    // Anything handed over at the counter is the bill's first receipt, so the
+    // ledger holds every payment from the outset rather than treating the
+    // opening one as a special case on the invoice row.
+    const receipts: Payment[] = input.paid.isZero()
+      ? []
+      : [
+          {
+            id: this.ids.next(),
+            shopId: this.identity.shop.id,
+            invoiceId,
+            amount: input.paid,
+            method: 'cash',
+            receivedAt: issuedAt,
+            note: null,
+          },
+        ];
+
     try {
-      await this.invoices.create(invoice, movements);
+      await this.invoices.create(invoice, movements, receipts);
     } catch (e) {
       return err(
         appError(

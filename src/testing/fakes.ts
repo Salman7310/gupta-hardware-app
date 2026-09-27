@@ -1,14 +1,22 @@
-import { Id } from '../core';
+import { Id, Money } from '../core';
 import { Customer } from '../models/customer';
 import { Invoice } from '../models/invoice';
+import { Payment } from '../models/payment';
 import { Product } from '../models/product';
+import { Quotation } from '../models/quotation';
 import { StockMovement } from '../models/stock-movement';
+import { BackupTables } from '../services/backup';
 import {
+  DocumentFiler,
   Clock,
   CustomerRepository,
   IdGenerator,
   InvoiceRepository,
+  PaymentRepository,
+  BackupFiler,
+  BackupRepository,
   ProductRepository,
+  QuotationRepository,
   SecureKeyStore,
   SettingsRepository,
   StockMovementRepository,
@@ -92,26 +100,131 @@ export class InMemoryStockMovementRepository implements StockMovementRepository 
   }
 }
 
+export class InMemoryPaymentRepository implements PaymentRepository {
+  constructor(public payments: Payment[] = []) {}
+
+  async listForInvoice(invoiceId: Id): Promise<Payment[]> {
+    return this.payments
+      .filter((p) => p.invoiceId === invoiceId)
+      .sort((a, b) => a.receivedAt - b.receivedAt);
+  }
+
+  async paidByInvoice(): Promise<Record<Id, number>> {
+    return this.payments.reduce<Record<Id, number>>((totals, p) => {
+      totals[p.invoiceId] = (totals[p.invoiceId] ?? 0) + p.amount.paise;
+      return totals;
+    }, {});
+  }
+
+  async append(payment: Payment): Promise<void> {
+    this.payments.push(payment);
+  }
+}
+
 export class InMemoryInvoiceRepository implements InvoiceRepository {
   constructor(
     public invoices: Invoice[] = [],
     private readonly stock = new InMemoryStockMovementRepository(),
+    public readonly payments = new InMemoryPaymentRepository(),
   ) {}
 
+  /**
+   * Reads derive `paid` from the payment ledger, exactly as the Drizzle
+   * repository does. A fake that kept the figure written at creation would let
+   * a test pass while the real app showed a stale amount due.
+   */
+  private async withPaid(invoice: Invoice): Promise<Invoice> {
+    const receipts = await this.payments.listForInvoice(invoice.id);
+    return { ...invoice, paid: Money.sum(receipts.map((r) => r.amount)) };
+  }
+
   async findById(id: Id): Promise<Invoice | null> {
-    return this.invoices.find((i) => i.id === id) ?? null;
+    const found = this.invoices.find((i) => i.id === id);
+    return found ? this.withPaid(found) : null;
   }
 
   async listRecent(limit: number): Promise<Invoice[]> {
-    return [...this.invoices].sort((a, b) => b.issuedAt - a.issuedAt).slice(0, limit);
+    const recent = [...this.invoices].sort((a, b) => b.issuedAt - a.issuedAt).slice(0, limit);
+    return Promise.all(recent.map((i) => this.withPaid(i)));
   }
 
-  async create(invoice: Invoice, movements: readonly StockMovement[]): Promise<void> {
+  async listUnsettled(): Promise<Invoice[]> {
+    const all = await Promise.all(
+      [...this.invoices]
+        .sort((a, b) => a.issuedAt - b.issuedAt)
+        .map((i) => this.withPaid(i)),
+    );
+    return all.filter((i) => i.paid.compare(i.grandTotal) < 0);
+  }
+
+  async create(
+    invoice: Invoice,
+    movements: readonly StockMovement[],
+    receipts: readonly Payment[] = [],
+  ): Promise<void> {
     if (this.invoices.some((i) => i.invoiceNo === invoice.invoiceNo)) {
       throw new Error(`duplicate invoice number ${invoice.invoiceNo}`);
     }
     this.invoices.push(invoice);
     for (const movement of movements) await this.stock.append(movement);
+    for (const receipt of receipts) await this.payments.append(receipt);
+  }
+}
+
+export class InMemoryQuotationRepository implements QuotationRepository {
+  constructor(public quotations: Quotation[] = []) {}
+
+  async findById(id: Id): Promise<Quotation | null> {
+    return this.quotations.find((q) => q.id === id) ?? null;
+  }
+
+  async listRecent(limit: number): Promise<Quotation[]> {
+    return [...this.quotations].sort((a, b) => b.issuedAt - a.issuedAt).slice(0, limit);
+  }
+
+  async create(quotation: Quotation): Promise<void> {
+    if (this.quotations.some((q) => q.quotationNo === quotation.quotationNo)) {
+      throw new Error(`duplicate quotation number ${quotation.quotationNo}`);
+    }
+    this.quotations.push(quotation);
+  }
+
+  async markAccepted(quotationId: Id, invoiceId: Id, _at: number): Promise<void> {
+    this.quotations = this.quotations.map((q) =>
+      q.id === quotationId ? { ...q, acceptedInvoiceId: invoiceId } : q,
+    );
+  }
+}
+
+export class InMemoryBackupRepository implements BackupRepository {
+  constructor(public tables: BackupTables = {}) {}
+
+  async dump(): Promise<BackupTables> {
+    return this.tables;
+  }
+
+  async replaceAll(tables: BackupTables): Promise<void> {
+    this.tables = tables;
+  }
+}
+
+/** Records what would have been written, and hands back what was planted. */
+export class InMemoryBackupFiler implements BackupFiler {
+  public written: { fileName: string; contents: string }[] = [];
+
+  constructor(
+    private readonly folder: string | null = 'content://folder/bills',
+    private readonly toPick: { name: string; contents: string } | null = null,
+  ) {}
+
+  async write(fileName: string, contents: string): Promise<string | null> {
+    if (!this.folder) return null;
+    this.written.push({ fileName, contents });
+    return `${this.folder}/${fileName}`;
+  }
+
+  async pick(): Promise<{ name: string; contents: string } | null> {
+    return this.toPick;
   }
 }
 
@@ -161,3 +274,67 @@ export class SequentialIdGenerator implements IdGenerator {
 }
 
 export const fixedClock = (at: number): Clock => ({ now: () => at });
+
+/**
+ * Records what would have been written or shared, so a test can assert on the
+ * document without a print engine or a granted folder.
+ */
+export class InMemoryDocumentFiler implements DocumentFiler {
+  public rendered: string[] = [];
+  public shared: { uri: string; fileName: string }[] = [];
+  public kept: { uri: string; fileName: string }[] = [];
+  public whatsApped: { uri: string; fileName: string; message: string; jid: string | null }[] = [];
+  private folder: string | null;
+
+  constructor(
+    folder: string | null = 'content://folder/bills',
+    private readonly whatsAppInstalled = true,
+  ) {
+    this.folder = folder;
+  }
+
+  async canShareOnWhatsApp(): Promise<boolean> {
+    return this.whatsAppInstalled;
+  }
+
+  async shareOnWhatsApp(
+    fileUri: string,
+    fileName: string,
+    message: string,
+    jid: string | null,
+  ): Promise<void> {
+    if (!this.whatsAppInstalled) throw new Error('WhatsApp is not installed on this phone.');
+    this.whatsApped.push({ uri: fileUri, fileName, message, jid });
+  }
+
+  async render(html: string): Promise<string> {
+    this.rendered.push(html);
+    return `file:///tmp/document-${this.rendered.length}.pdf`;
+  }
+
+  async share(fileUri: string, fileName: string): Promise<void> {
+    this.shared.push({ uri: fileUri, fileName });
+  }
+
+  async keep(fileUri: string, fileName: string): Promise<string | null> {
+    if (!this.folder) return null;
+    this.kept.push({ uri: fileUri, fileName });
+    return `${this.folder}/${fileName}`;
+  }
+
+  async chosenFolder(): Promise<string | null> {
+    return this.folder;
+  }
+
+  async forgetFolder(): Promise<void> {
+    this.folder = null;
+  }
+
+  /**
+   * Stands in for the system folder picker granting access, which is what
+   * happens the first time a backup or a Save PDF runs without a folder.
+   */
+  grantFolder(uri = 'content://folder/bills'): void {
+    this.folder = uri;
+  }
+}

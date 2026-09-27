@@ -1,0 +1,7 @@
+{
+  "name": "whatsapp-share",
+  "version": "0.1.0",
+  "description": "Sends a document straight into WhatsApp, rather than through the system chooser.",
+  "main": "src/index.ts",
+  "private": true
+}

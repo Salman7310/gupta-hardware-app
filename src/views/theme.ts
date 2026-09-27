@@ -29,6 +29,10 @@ export const theme = {
   accentInk: '#0F7355',
   accentSurface: '#E8F5EF',
 
+  /** WhatsApp's own green. A fill only — white sits on it. */
+  whatsapp: '#25D366',
+  whatsappPressed: '#1DA851',
+
   danger: '#A32D2D',
   dangerSurface: '#FBEDED',
   warningBg: '#FAEEDA',
@@ -108,11 +112,20 @@ export const card: ViewStyle = {
   ...elevation.card,
 };
 
-/** Shared by every stack screen, so headers do not drift apart. */
-export const screenOptions = {
+/**
+ * The header, shared by the stack and the tabs so the two never drift apart.
+ * Kept separate from `screenOptions` because `contentStyle` belongs to a stack
+ * and a tab navigator does not take it.
+ */
+export const headerOptions = {
   headerTitleStyle: { ...type.heading, color: theme.text },
   headerStyle: { backgroundColor: theme.background },
   headerShadowVisible: false,
   headerTintColor: theme.accentInk,
+} as const;
+
+/** Shared by every stack screen. */
+export const screenOptions = {
+  ...headerOptions,
   contentStyle: { backgroundColor: theme.background },
 } as const;

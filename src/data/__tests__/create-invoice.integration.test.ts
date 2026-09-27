@@ -35,7 +35,7 @@ const SHOP = 'shop-1';
 const DEVICE = 'device-1';
 
 const identity: Identity = {
-  shop: { id: SHOP, name: 'Gupta Hardware', address: null, gstin: null, invoicePrefix: 'GH' },
+  shop: { id: SHOP, name: 'Gupta Hardware', address: null, phone: null, gstin: null, invoicePrefix: 'GH' },
   device: { id: DEVICE, letter: 'A' },
 };
 
@@ -248,6 +248,7 @@ describe('CreateInvoice against a real database', () => {
           occurredAt: NOW,
           note: null,
         })),
+        [],
       ),
     ).rejects.toThrow();
 

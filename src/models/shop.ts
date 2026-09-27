@@ -4,6 +4,8 @@ export interface Shop {
   readonly id: Id;
   readonly name: string;
   readonly address: string | null;
+  /** Printed on every bill, so a customer with a question can ring the shop. */
+  readonly phone: string | null;
   readonly gstin: string | null;
   /** Leading part of the invoice series, e.g. "GH" in GH/A/0048. */
   readonly invoicePrefix: string;

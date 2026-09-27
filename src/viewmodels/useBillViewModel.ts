@@ -3,21 +3,29 @@ import { useContainer } from '../di/provider';
 import { Customer } from '../models/customer';
 import { BillTotals, CalculatedLine, Invoice } from '../models/invoice';
 import { Product } from '../models/product';
+import { Quotation } from '../models/quotation';
 import {
   BillDraft,
   BillErrors,
   BillLineField,
   DimensionField,
-  emptyBillDraft,
-  emptyDimensionDraft,
-  lineFromProduct,
   readableBillDiscount,
-  toLineItem,
   validateBill,
 } from '../services/bill';
-import { calculateBill } from '../services/bill-calculator';
+import { useLineEntry } from './useLineEntry';
 
 const NO_ERRORS: BillErrors = { lines: {} };
+
+/**
+ * A bill that starts from something rather than from nothing — today, an
+ * accepted quotation. Read once when the screen mounts, so the route must have
+ * it in hand before rendering the form.
+ */
+export interface BillStart {
+  readonly draft: BillDraft;
+  readonly customer: Customer | null;
+  readonly quotation: Quotation | null;
+}
 
 export interface BillViewModel {
   readonly draft: BillDraft;
@@ -30,6 +38,8 @@ export interface BillViewModel {
   readonly isEmpty: boolean;
   /** Null is a walk-in, which is most counter sales. */
   readonly customer: Customer | null;
+  /** The quotation this bill was started from, for the note on the screen. */
+  readonly startedFrom: Quotation | null;
   setCustomer(customer: Customer | null): void;
   addProduct(product: Product): void;
   removeLine(key: string): void;
@@ -42,6 +52,7 @@ export interface BillViewModel {
     field: DimensionField,
     value: string,
   ): void;
+  setMeasuring(lineKey: string, measured: boolean): void;
   setBillDiscount(value: string): void;
   setPaid(value: string): void;
   setNotes(value: string): void;
@@ -53,120 +64,39 @@ export interface BillViewModel {
  * The arithmetic lives in the calculator and the writing in CreateInvoice;
  * nothing here touches a repository directly.
  */
-export function useBillViewModel(): BillViewModel {
-  const { createInvoice, ids } = useContainer();
-  const [draft, setDraft] = useState<BillDraft>(emptyBillDraft);
+export function useBillViewModel(start?: BillStart): BillViewModel {
+  const { createInvoice, paymentBook, billArchive, quotations } = useContainer();
+  const [billDiscount, setBillDiscount] = useState(start?.draft.billDiscount ?? '');
+  const [paid, setPaid] = useState(start?.draft.paid ?? '');
+  const [notes, setNotes] = useState(start?.draft.notes ?? '');
   const [errors, setErrors] = useState<BillErrors>(NO_ERRORS);
   const [isSaving, setIsSaving] = useState(false);
-  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [customer, setCustomer] = useState<Customer | null>(start?.customer ?? null);
+  const [startedFrom, setStartedFrom] = useState<Quotation | null>(start?.quotation ?? null);
 
-  // Kept beside their keys, so a row can show its own total even though the
-  // calculator only ever sees the lines that currently read.
-  const readable = useMemo(
-    () => draft.lines.map((line) => ({ key: line.key, item: toLineItem(line) })),
-    [draft],
+  const discount = useMemo(() => readableBillDiscount(billDiscount), [billDiscount]);
+  const entry = useLineEntry(discount, start?.draft.lines ?? []);
+  const { replaceAll } = entry;
+
+  const draft = useMemo<BillDraft>(
+    () => ({ lines: entry.lines, billDiscount, paid, notes }),
+    [entry.lines, billDiscount, paid, notes],
   );
 
-  const totals = useMemo(
-    () =>
-      calculateBill(
-        readable.flatMap((r) => (r.item ? [r.item] : [])),
-        readableBillDiscount(draft),
-      ),
-    [readable, draft],
-  );
-
-  const lineTotals = useMemo(() => {
-    const byKey: Record<string, CalculatedLine> = {};
-    let index = 0;
-    for (const entry of readable) {
-      if (entry.item) {
-        byKey[entry.key] = totals.lines[index];
-        index += 1;
+  const archiveQuietly = useCallback(
+    async (invoice: Invoice) => {
+      try {
+        if (!(await billArchive.chosenFolder())) return;
+        const receipts = await paymentBook.listFor(invoice.id);
+        await billArchive.keep(invoice, customer, receipts);
+      } catch {
+        // The bill itself is saved. Failing to write the PDF copy must never
+        // look like a failed sale, so it is swallowed here and the owner can
+        // retry from the bill with Save PDF.
       }
-    }
-    return byKey;
-  }, [readable, totals]);
-
-  const addProduct = useCallback(
-    (product: Product) => {
-      setDraft((current) => ({
-        ...current,
-        lines: [...current.lines, lineFromProduct(product, ids.next())],
-      }));
     },
-    [ids],
+    [billArchive, paymentBook, customer],
   );
-
-  const removeLine = useCallback((key: string) => {
-    setDraft((current) => ({
-      ...current,
-      lines: current.lines.filter((line) => line.key !== key),
-    }));
-  }, []);
-
-  const setLineField = useCallback((key: string, field: BillLineField, value: string) => {
-    setDraft((current) => ({
-      ...current,
-      lines: current.lines.map((line) => (line.key === key ? { ...line, [field]: value } : line)),
-    }));
-  }, []);
-
-  const addDimension = useCallback(
-    (lineKey: string) => {
-      setDraft((current) => ({
-        ...current,
-        lines: current.lines.map((line) =>
-          line.key === lineKey
-            ? { ...line, dimensions: [...line.dimensions, emptyDimensionDraft(ids.next())] }
-            : line,
-        ),
-      }));
-    },
-    [ids],
-  );
-
-  const removeDimension = useCallback((lineKey: string, dimensionKey: string) => {
-    setDraft((current) => ({
-      ...current,
-      lines: current.lines.map((line) =>
-        line.key === lineKey
-          ? { ...line, dimensions: line.dimensions.filter((d) => d.key !== dimensionKey) }
-          : line,
-      ),
-    }));
-  }, []);
-
-  const setDimensionField = useCallback(
-    (lineKey: string, dimensionKey: string, field: DimensionField, value: string) => {
-      setDraft((current) => ({
-        ...current,
-        lines: current.lines.map((line) =>
-          line.key === lineKey
-            ? {
-                ...line,
-                dimensions: line.dimensions.map((d) =>
-                  d.key === dimensionKey ? { ...d, [field]: value } : d,
-                ),
-              }
-            : line,
-        ),
-      }));
-    },
-    [],
-  );
-
-  const setBillDiscount = useCallback((billDiscount: string) => {
-    setDraft((current) => ({ ...current, billDiscount }));
-  }, []);
-
-  const setPaid = useCallback((paid: string) => {
-    setDraft((current) => ({ ...current, paid }));
-  }, []);
-
-  const setNotes = useCallback((notes: string) => {
-    setDraft((current) => ({ ...current, notes }));
-  }, []);
 
   const save = useCallback(async (): Promise<Invoice | null> => {
     const validated = validateBill(draft);
@@ -190,53 +120,55 @@ export function useBillViewModel(): BillViewModel {
         return null;
       }
 
-      setDraft(emptyBillDraft());
+      // Keep a PDF of every bill as it is written, so the shop's records do
+      // not depend on this app still being installed. Only when a folder has
+      // already been granted: the first bill of the day is the wrong moment to
+      // put a system folder picker in front of someone at the counter, so that
+      // prompt waits for the Save PDF button on the bill itself.
+      void archiveQuietly(result.value);
+
+      // The estimate has become a sale. Recorded quietly for the same reason:
+      // a failure to link them is not a failure to bill.
+      if (startedFrom) {
+        void quotations.markAccepted(startedFrom, result.value).catch(() => undefined);
+      }
+
+      replaceAll([]);
+      setBillDiscount('');
+      setPaid('');
+      setNotes('');
       setErrors(NO_ERRORS);
       setCustomer(null);
+      setStartedFrom(null);
       return result.value;
     } finally {
       setIsSaving(false);
     }
-  }, [createInvoice, draft, customer]);
+  }, [createInvoice, draft, customer, archiveQuietly, startedFrom, quotations, replaceAll]);
 
   return useMemo(
     () => ({
       draft,
-      totals,
-      lineTotals,
+      totals: entry.totals,
+      lineTotals: entry.lineTotals,
       errors,
       isSaving,
-      isEmpty: draft.lines.length === 0,
+      isEmpty: entry.isEmpty,
       customer,
+      startedFrom,
       setCustomer,
-      addProduct,
-      removeLine,
-      setLineField,
-      addDimension,
-      removeDimension,
-      setDimensionField,
+      addProduct: entry.addProduct,
+      removeLine: entry.removeLine,
+      setLineField: entry.setLineField,
+      addDimension: entry.addDimension,
+      removeDimension: entry.removeDimension,
+      setDimensionField: entry.setDimensionField,
+      setMeasuring: entry.setMeasuring,
       setBillDiscount,
       setPaid,
       setNotes,
       save,
     }),
-    [
-      draft,
-      totals,
-      lineTotals,
-      errors,
-      isSaving,
-      customer,
-      addProduct,
-      removeLine,
-      setLineField,
-      addDimension,
-      removeDimension,
-      setDimensionField,
-      setBillDiscount,
-      setPaid,
-      setNotes,
-      save,
-    ],
+    [draft, entry, errors, isSaving, customer, startedFrom, save],
   );
 }

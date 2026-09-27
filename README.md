@@ -11,6 +11,8 @@ marble, granite, wall putty and paint. The shop writes every bill by hand today.
   by square feet from length by width, tiles by the box, putty by the bag, paint
   by the litre
 - Produces a GST invoice as a PDF and shares it to the customer over WhatsApp
+- Prices up a job as a quotation before anything is sold, shares it as a PDF,
+  and reopens it as a bill when the customer accepts
 - Tracks stock as a ledger of movements, with live quantities and low-stock alerts
 - Scans paper bills with the camera and keeps them as a searchable archive
 
@@ -46,7 +48,14 @@ See [`docs/sprints.md`](docs/sprints.md).
 | Customer picker                     | not started — every bill is a walk-in          |
 | Golden tests from the shop's bills  | not started — waiting on the bills             |
 | Barcode lookup                      | not done — deferred, see below                 |
-| PDF, backup, scanner, reports       | not started                                    |
+| PDF bill, share and saved copy       | done, saved outside the app so it survives an uninstall |
+| Part payments and dues              | done, receipts kept as a ledger                |
+| Quotations                          | done, own series, shared pricing, converts to a bill |
+| Shop details                        | done, editable after setup, printed on every document |
+| Send a bill or quote on WhatsApp    | done, PDF straight to the customer's chat      |
+| Backup and restore                  | done, whole shop to the folder that outlives the app |
+| Release signing                     | done, own keystore; updates install over each other |
+| Scanner, reports                    | not started                                    |
 
 Known problems, none of them cosmetic:
 
@@ -54,8 +63,10 @@ Known problems, none of them cosmetic:
   rather than matching on name, and stock then splits across the copies.
 - Stock is allowed to go negative, deliberately, so a wrong stock figure can
   never block a sale at the counter. Nothing yet draws attention to it.
-- GST is optional on the product form and a blank one saves as 0%. The field
-  shows a grey 18 as a placeholder, which reads like a value.
+- Two devices do not sync. Each keeps its own bills, stock and dues; only the
+  bill-number series is designed to avoid collisions between counters.
+- Backups are manual. A shopkeeper who never taps the button has none, though
+  the Shop screen now says "Never" in red until one exists.
 
 Barcode scanning was in the Sprint 2 plan and was deliberately dropped rather
 than rushed. It needs camera permission plumbing and another native rebuild,
@@ -110,6 +121,11 @@ add `import { View } from 'react-native'` to a file in `src/core` and run
 lose a paisa on an eighteen-percent calculation and the shopkeeper notices. See
 [ADR 0002](docs/adr/0002-money-and-rounding.md).
 
+**A quotation is not an unsold bill.** It has its own tables and its own number
+series, moves no stock and is owed by nobody, but is priced by the same
+calculator so the estimate matches the bill to the paisa. See
+[ADR 0005](docs/adr/0005-quotations-are-not-invoices.md).
+
 **Quantities are integer sub-units.** Marble is stored as square inches, not
 square feet, so 5'6" by 2'3" is exactly 1782 square inches. Paint is millilitres.
 Tiles and bags are whole counts. Division happens once, at the end.
@@ -137,7 +153,9 @@ answering before the billing screen is built.
    this no longer blocks anything — a lump sum is apportioned across the lines
    by taxable value before tax, which is the method the GST guidance describes.
    Still worth confirming which the shop uses, so the screen can lead with it.
-8. Are quotations written before a sale, and how often does one become a bill?
+8. Quotations: how long should the prices hold? Seven days is the default and
+   is a guess. The app now records which estimates became bills, so how often
+   one converts will answer itself once the shop has used it for a month.
 
 GST rates and HSN codes should be read off the shop's existing bills and
 confirmed by their accountant, not looked up.

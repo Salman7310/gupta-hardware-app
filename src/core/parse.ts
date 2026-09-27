@@ -55,3 +55,17 @@ export function parseWholeNumber(raw: string): number | null {
   if (!/^\d+$/.test(cleaned)) return null;
   return Number(cleaned);
 }
+
+/**
+ * The inverse of `parsePercentToBps`, for putting a stored rate back into a
+ * field the shopkeeper can edit. 550 reads as "5.5", and zero reads as blank
+ * rather than "0", because a discount field showing a zero looks like one that
+ * has been filled in.
+ */
+export function formatPercentFromBps(bps: number): string {
+  if (bps === 0) return '';
+  const whole = Math.trunc(bps / 100);
+  const fraction = Math.abs(bps % 100);
+  if (fraction === 0) return String(whole);
+  return `${whole}.${String(fraction).padStart(2, '0').replace(/0$/, '')}`;
+}
