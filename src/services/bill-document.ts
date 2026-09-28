@@ -1,6 +1,6 @@
 import { formatDate, formatTime } from '../core';
 import { Customer } from '../models/customer';
-import { Invoice, amountDue, paymentState } from '../models/invoice';
+import { Invoice, amountDue, billState, isCancelled } from '../models/invoice';
 import { Payment, paymentMethodLabel } from '../models/payment';
 import { Shop } from '../models/shop';
 import {
@@ -50,7 +50,12 @@ function paymentsBlock(payments: readonly Payment[]): string {
     </table>`;
 }
 
-const STATUS_WORD = { paid: 'Paid in full', partial: 'Part paid', unpaid: 'Unpaid' } as const;
+const STATUS_WORD = {
+  paid: 'Paid in full',
+  partial: 'Part paid',
+  unpaid: 'Unpaid',
+  cancelled: 'Cancelled',
+} as const;
 
 /**
  * The bill as it is printed and shared. Built from `document-html`, so it and
@@ -59,7 +64,7 @@ const STATUS_WORD = { paid: 'Paid in full', partial: 'Part paid', unpaid: 'Unpai
 export function renderBillHtml(doc: BillDocument): string {
   const { shop, invoice, customer, payments } = doc;
   const due = amountDue(invoice);
-  const status = paymentState(invoice);
+  const status = billState(invoice);
   const settled = status === 'paid' ? '' : ' warn';
 
   const totals = [
@@ -90,6 +95,11 @@ export function renderBillHtml(doc: BillDocument): string {
         <div class="num"><span class="status${settled}">${STATUS_WORD[status]}</span></div>
       </div>
     </header>
+    ${
+      isCancelled(invoice)
+        ? `<div class="cancelled-note">This bill was cancelled on ${escape(formatDate(invoice.cancelledAt as number))} · ${escape(formatTime(invoice.cancelledAt as number))}. It is void and nothing is owed on it.</div>`
+        : ''
+    }
 
     <hr />
 

@@ -1,4 +1,4 @@
-import { Id } from '../core';
+import { AppError, Id, Result, appError, err, ok } from '../core';
 import { Invoice } from '../models/invoice';
 import { Quotation } from '../models/quotation';
 import { Clock, QuotationRepository } from './ports';
@@ -30,5 +30,30 @@ export class QuotationBook {
   async markAccepted(quotation: Quotation, invoice: Invoice): Promise<void> {
     if (quotation.acceptedInvoiceId) return;
     await this.quotations.markAccepted(quotation.id, invoice.id, this.clock.now());
+  }
+
+  /**
+   * Drops an estimate the shop no longer needs.
+   *
+   * Safe in a way that deleting a bill is not: an estimate is an offer, it
+   * carries no tax and nobody has to be able to produce it years later. Most
+   * are never taken up, and a Quotes tab full of dead ones hides the live
+   * ones.
+   *
+   * An estimate that has already become a bill is refused. The bill is the
+   * record of the sale and it stays either way, but the link back to what was
+   * quoted is worth keeping: it is how the shop sees which quotes convert.
+   */
+  async remove(quotation: Quotation): Promise<Result<void, AppError>> {
+    if (quotation.acceptedInvoiceId) {
+      return err(
+        appError(
+          'quotation.accepted',
+          'This estimate became a bill, so it is kept. Cancel the bill instead.',
+        ),
+      );
+    }
+    await this.quotations.remove(quotation.id, this.clock.now());
+    return ok(undefined);
   }
 }

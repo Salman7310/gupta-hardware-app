@@ -105,7 +105,10 @@ export class DrizzleInvoiceRepository implements InvoiceRepository {
     if (rows.length === 0) return [];
 
     const paid = await this.paidFor(rows.map((r) => r.id));
-    const owing = rows.filter((row) => (paid[row.id] ?? 0) < row.grandTotalPaise);
+    // A cancelled bill is not a debt, however little was paid against it.
+    const owing = rows.filter(
+      (row) => row.cancelledAt === null && (paid[row.id] ?? 0) < row.grandTotalPaise,
+    );
     if (owing.length === 0) return [];
 
     const items = await this.db
@@ -173,6 +176,25 @@ export class DrizzleInvoiceRepository implements InvoiceRepository {
       }
 
       for (const movement of addedMovements) {
+        await tx.insert(stockMovements).values(toStockMovementRow(movement, this.deviceId));
+      }
+    });
+  }
+
+  async cancel(invoice: Invoice, reversals: readonly StockMovement[]): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(invoices)
+        .set({
+          cancelledAt: invoice.cancelledAt,
+          updatedAt: invoice.cancelledAt ?? invoice.issuedAt,
+          deviceId: this.deviceId,
+        })
+        .where(and(this.scope, eq(invoices.id, invoice.id)));
+
+      // The goods come back as new rows. Nothing the sale wrote is touched,
+      // so the ledger still shows the stock going out as well as returning.
+      for (const movement of reversals) {
         await tx.insert(stockMovements).values(toStockMovementRow(movement, this.deviceId));
       }
     });

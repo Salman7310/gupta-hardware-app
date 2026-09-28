@@ -176,6 +176,21 @@ export const DOCUMENT_CSS = `
         color: #0F7355;
       }
       .status.warn { background: #FBEDED; color: #A32D2D; }
+      /*
+        Loud on purpose. The customer may be holding a printed copy of this
+        bill from before it was cancelled, so the cancelled one has to be
+        impossible to mistake for it at a glance.
+      */
+      .cancelled-note {
+        margin-top: 14px;
+        padding: 10px 14px;
+        border: 1px solid #A32D2D;
+        border-radius: 6px;
+        background: #FBEDED;
+        color: #A32D2D;
+        font-size: 12px;
+        font-weight: 600;
+      }
       hr { border: none; border-top: 1px solid #E3E3DC; margin: 18px 0; }
       .party .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; color: #6E6E68; }
       .party .name { font-size: 15px; font-weight: 600; margin: 2px 0 2px; }

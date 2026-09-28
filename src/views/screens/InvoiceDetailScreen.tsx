@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -65,12 +66,23 @@ export function InvoiceDetailScreen({ invoiceId }: Props) {
           {vm.state ? <PaymentBadge state={vm.state} /> : null}
         </View>
 
+        {vm.isCancelled && vm.invoice?.cancelledAt ? (
+          <View style={styles.cancelledBanner}>
+            <Text style={styles.cancelledTitle}>This bill is cancelled</Text>
+            <Text style={styles.cancelledBody}>
+              Cancelled on {formatDate(vm.invoice.cancelledAt)} at{' '}
+              {formatTime(vm.invoice.cancelledAt)}. The stock is back on the shelf and nothing is
+              owed. It keeps its number so the bill book reads straight.
+            </Text>
+          </View>
+        ) : null}
+
         {/*
           WhatsApp gets its own row and the brand's green because it is what
           the shop actually uses to send a bill; Share and Save PDF are the
           fallbacks for everything else.
         */}
-        {vm.canWhatsApp ? (
+        {vm.canWhatsApp && !vm.isCancelled ? (
           <Pressable
             onPress={() => void vm.sendOnWhatsApp()}
             disabled={vm.isWhatsApping}
@@ -122,13 +134,15 @@ export function InvoiceDetailScreen({ invoiceId }: Props) {
           {invoice.items.map((item) => (
             <Line key={item.id} item={item} />
           ))}
-          <Pressable
-            onPress={vm.startAddingItems}
-            style={styles.recordButton}
-            accessibilityRole="button"
-          >
-            <Text style={styles.recordLabel}>+ Add more items to this bill</Text>
-          </Pressable>
+          {vm.isCancelled ? null : (
+            <Pressable
+              onPress={vm.startAddingItems}
+              style={styles.recordButton}
+              accessibilityRole="button"
+            >
+              <Text style={styles.recordLabel}>+ Add more items to this bill</Text>
+            </Pressable>
+          )}
           {invoice.amendedAt ? (
             <Text style={styles.amended}>
               Items were added on {formatDate(invoice.amendedAt)} at{' '}
@@ -162,7 +176,12 @@ export function InvoiceDetailScreen({ invoiceId }: Props) {
             vm.payments.map((payment) => <Receipt key={payment.id} payment={payment} />)
           )}
 
-          {settled ? (
+          {vm.isCancelled ? (
+            <Text style={styles.settled}>
+              Cancelled, so nothing more is taken against it. Anything already received stays
+              listed above — refund it at the counter.
+            </Text>
+          ) : settled ? (
             <Text style={styles.settled}>This bill is settled in full.</Text>
           ) : (
             <Pressable
@@ -176,6 +195,30 @@ export function InvoiceDetailScreen({ invoiceId }: Props) {
         </View>
 
         {invoice.notes ? <Text style={styles.notes}>{invoice.notes}</Text> : null}
+
+        {/*
+          Kept at the very bottom, plain and grey rather than red and prominent.
+          Cancelling is rare and irreversible from inside the app, so it should
+          take deliberate scrolling to reach, never sit next to Share.
+        */}
+        {vm.isCancelled ? null : (
+          <Pressable
+            onPress={() => confirmCancel(vm)}
+            disabled={vm.isCancelling}
+            style={styles.cancelBill}
+            accessibilityRole="button"
+          >
+            <Text style={styles.cancelBillLabel}>
+              {vm.isCancelling ? 'Cancelling…' : 'Cancel this bill'}
+            </Text>
+          </Pressable>
+        )}
+
+        {vm.cancelError ? (
+          <Pressable onPress={vm.dismissCancelError}>
+            <Text style={styles.fileError}>{vm.cancelError}</Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
 
       <Modal
@@ -327,6 +370,31 @@ function RecordPayment({ vm }: { vm: InvoiceDetailViewModel }) {
         </Pressable>
       </ScrollView>
     </View>
+  );
+}
+
+/**
+ * Cancelling asks first, and says what it will do in the shop's own terms.
+ *
+ * The bill cannot be un-cancelled from inside the app, and the customer may
+ * already be holding a printed copy, so the question names the bill and spells
+ * out the consequences rather than asking a bare "are you sure?".
+ */
+function confirmCancel(vm: InvoiceDetailViewModel): void {
+  const invoice = vm.invoice;
+  if (!invoice) return;
+
+  Alert.alert(
+    `Cancel ${invoice.invoiceNo}?`,
+    `The bill keeps its number and stays in the book marked cancelled, the ${invoice.items.length === 1 ? 'item goes' : 'items go'} back into stock, and it stops counting toward dues. This cannot be undone.`,
+    [
+      { text: 'Keep the bill', style: 'cancel' },
+      {
+        text: 'Cancel the bill',
+        style: 'destructive',
+        onPress: () => void vm.cancelBill(),
+      },
+    ],
   );
 }
 
@@ -491,6 +559,25 @@ const styles = StyleSheet.create({
   receiptHow: { fontSize: 12, color: theme.textMuted, marginTop: 2 },
   settled: { fontSize: 13, color: theme.accentInk },
   amended: { ...type.caption, color: theme.textMuted, lineHeight: 20 },
+
+  cancelledBanner: {
+    borderWidth: 1,
+    borderColor: theme.danger,
+    backgroundColor: theme.dangerSurface,
+    borderRadius: 10,
+    padding: space.lg,
+    gap: space.xs,
+  },
+  cancelledTitle: { ...type.body, fontWeight: '700', color: theme.danger },
+  cancelledBody: { ...type.caption, color: theme.danger, lineHeight: 20 },
+
+  cancelBill: {
+    alignSelf: 'center',
+    paddingVertical: space.md,
+    paddingHorizontal: space.lg,
+    marginTop: space.lg,
+  },
+  cancelBillLabel: { ...type.body, color: theme.textMuted },
   addHint: { ...type.caption, color: theme.textMuted, lineHeight: 20 },
   addEmpty: { ...type.body, color: theme.textMuted, textAlign: 'center', paddingVertical: space.lg },
   recordButton: {

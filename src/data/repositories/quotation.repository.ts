@@ -78,4 +78,21 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       .set({ acceptedInvoiceId: invoiceId, updatedAt: at, deviceId: this.deviceId })
       .where(and(this.scope, eq(quotations.id, quotationId)));
   }
+
+  async remove(quotationId: Id, at: number): Promise<void> {
+    // Tombstoned, not dropped. Every repository already reads through an
+    // `isNull(deletedAt)` filter, so this is gone from the app the moment it
+    // is written, while the row that says so can still reach another device.
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(quotations)
+        .set({ deletedAt: at, updatedAt: at, deviceId: this.deviceId })
+        .where(and(this.scope, eq(quotations.id, quotationId)));
+
+      await tx
+        .update(quotationItems)
+        .set({ deletedAt: at, updatedAt: at, deviceId: this.deviceId })
+        .where(eq(quotationItems.quotationId, quotationId));
+    });
+  }
 }

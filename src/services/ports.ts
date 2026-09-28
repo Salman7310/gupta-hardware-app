@@ -61,6 +61,15 @@ export interface InvoiceRepository {
    * bill's lines can still be reconciled against a copy the customer holds.
    */
   amend(invoice: Invoice, addedMovements: readonly StockMovement[]): Promise<void>;
+  /**
+   * Cancels a bill and puts back what it took off the shelf.
+   *
+   * The invoice row is marked, never removed, so GH/A/0003 keeps its place in
+   * the series. The stock comes back as fresh reversing movements rather than
+   * by deleting the sale rows, because the ledger is append-only and the shop
+   * should be able to see both that the goods went out and that they came back.
+   */
+  cancel(invoice: Invoice, reversals: readonly StockMovement[]): Promise<void>;
 }
 
 /**
@@ -74,6 +83,15 @@ export interface QuotationRepository {
   create(quotation: Quotation): Promise<void>;
   /** Records the bill a quotation became, so the shop can see what converted. */
   markAccepted(quotationId: Id, invoiceId: Id, at: number): Promise<void>;
+  /**
+   * Drops an estimate the shop no longer wants.
+   *
+   * An estimate is an offer, not a tax document, so there is nothing to keep
+   * and it goes for good as far as the shop is concerned. The row is tombstoned
+   * rather than removed outright, because a row that simply vanishes cannot
+   * sync: the other device never learns it should go too.
+   */
+  remove(quotationId: Id, at: number): Promise<void>;
 }
 
 export interface PaymentRepository {

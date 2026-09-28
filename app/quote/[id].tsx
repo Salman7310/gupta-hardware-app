@@ -11,6 +11,7 @@ export default function QuotationRoute() {
       quotationId={id}
       onMakeBill={(quotationId) => router.push(`/bill/new?from=${quotationId}`)}
       onOpenBill={(invoiceId) => router.push(`/bill/${invoiceId}`)}
+      onDeleted={() => router.back()}
     />
   );
 }

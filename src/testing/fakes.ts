@@ -154,7 +154,14 @@ export class InMemoryInvoiceRepository implements InvoiceRepository {
         .sort((a, b) => a.issuedAt - b.issuedAt)
         .map((i) => this.withPaid(i)),
     );
-    return all.filter((i) => i.paid.compare(i.grandTotal) < 0);
+    return all.filter((i) => i.cancelledAt === null && i.paid.compare(i.grandTotal) < 0);
+  }
+
+  async cancel(invoice: Invoice, reversals: readonly StockMovement[]): Promise<void> {
+    const index = this.invoices.findIndex((i) => i.id === invoice.id);
+    if (index < 0) throw new Error(`no bill ${invoice.id} to cancel`);
+    this.invoices[index] = invoice;
+    for (const movement of reversals) await this.stock.append(movement);
   }
 
   async amend(invoice: Invoice, addedMovements: readonly StockMovement[]): Promise<void> {
@@ -200,6 +207,14 @@ export class InMemoryQuotationRepository implements QuotationRepository {
     this.quotations = this.quotations.map((q) =>
       q.id === quotationId ? { ...q, acceptedInvoiceId: invoiceId } : q,
     );
+  }
+
+  /**
+   * Drops it from the list, as the tombstone does in the real repository: no
+   * read there ever sees a row with `deletedAt` set.
+   */
+  async remove(quotationId: Id, _at: number): Promise<void> {
+    this.quotations = this.quotations.filter((q) => q.id !== quotationId);
   }
 }
 

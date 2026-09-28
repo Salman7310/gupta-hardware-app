@@ -68,6 +68,15 @@ export interface InvoiceItem {
 
 export type PaymentState = 'paid' | 'partial' | 'unpaid';
 
+/**
+ * What the bill list, the badge and the PDF show.
+ *
+ * Cancelled sits alongside the payment states rather than inside them because
+ * it answers a different question. A cancelled bill is not unpaid — nobody
+ * owes anything on it — and it is not paid either. It is no longer about money.
+ */
+export type BillState = PaymentState | 'cancelled';
+
 export interface Invoice {
   readonly id: Id;
   readonly shopId: Id;
@@ -95,6 +104,15 @@ export interface Invoice {
    * should be able to see that the bill grew after it was first made.
    */
   readonly amendedAt: number | null;
+  /**
+   * When the bill was cancelled, if it was.
+   *
+   * The bill is kept rather than removed. Under GST the invoice series has to
+   * run unbroken, so a missing GH/A/0003 is a question an auditor will ask;
+   * a cancelled GH/A/0003 is an answer. The stock it took is put back by
+   * appending reversing movements, never by editing the ones it wrote.
+   */
+  readonly cancelledAt: number | null;
   readonly items: readonly InvoiceItem[];
 }
 
@@ -115,7 +133,19 @@ export function paymentState(invoice: Invoice): PaymentState {
   return invoice.paid.isZero() ? 'unpaid' : 'partial';
 }
 
+export function isCancelled(invoice: Invoice): boolean {
+  return invoice.cancelledAt !== null;
+}
+
+export function billState(invoice: Invoice): BillState {
+  return isCancelled(invoice) ? 'cancelled' : paymentState(invoice);
+}
+
 export function amountDue(invoice: Invoice): Money {
+  // A cancelled bill is not a debt. Anything already taken against it is a
+  // refund the shop settles with the customer, not something this app tracks
+  // as owing, and leaving it in would overstate the day's dues.
+  if (isCancelled(invoice)) return Money.zero;
   const due = invoice.grandTotal.subtract(invoice.paid);
   return due.isNegative() ? Money.zero : due;
 }

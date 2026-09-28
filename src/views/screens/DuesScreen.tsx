@@ -53,7 +53,7 @@ export function DuesScreen({ onOpenBill }: Props) {
         </View>
         <Text style={styles.emptyTitle}>Nothing outstanding</Text>
         <Text style={styles.emptyText}>
-          Every bill has been paid in full. Part payments you record will show up here.
+          No bill is waiting on payment. Part payments you record will show up here.
         </Text>
       </View>
     );

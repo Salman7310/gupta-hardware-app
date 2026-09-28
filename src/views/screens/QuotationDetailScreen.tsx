@@ -1,9 +1,20 @@
 import React, { useCallback } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Money, formatDate } from '../../core';
 import { QuotationItem } from '../../models/quotation';
-import { useQuotationDetailViewModel } from '../../viewmodels/useQuotationDetailViewModel';
+import {
+  QuotationDetailViewModel,
+  useQuotationDetailViewModel,
+} from '../../viewmodels/useQuotationDetailViewModel';
 import { QuotationBadge } from './QuotationListScreen';
 import { theme, type } from '../theme';
 
@@ -11,6 +22,8 @@ interface Props {
   readonly quotationId: string;
   readonly onMakeBill: (quotationId: string) => void;
   readonly onOpenBill: (invoiceId: string) => void;
+  /** Called once the estimate is gone, so the screen showing it can close. */
+  readonly onDeleted: () => void;
 }
 
 /**
@@ -20,7 +33,12 @@ interface Props {
  * customer was quoted a price, and the shop stands behind that price until the
  * date on it passes, whatever the catalogue says by then.
  */
-export function QuotationDetailScreen({ quotationId, onMakeBill, onOpenBill }: Props) {
+export function QuotationDetailScreen({
+  quotationId,
+  onMakeBill,
+  onOpenBill,
+  onDeleted,
+}: Props) {
   const vm = useQuotationDetailViewModel(quotationId);
   const { refresh } = vm;
 
@@ -156,6 +174,30 @@ export function QuotationDetailScreen({ quotationId, onMakeBill, onOpenBill }: P
         This is an estimate, not a tax invoice. Nothing has been sold, no stock has moved and no
         tax has been charged.
       </Text>
+
+      {/*
+        Offered plainly, because deleting an estimate is genuinely low stakes —
+        nothing was sold and no tax was charged. It still asks first, since the
+        estimate cannot be brought back.
+      */}
+      {vm.canDelete ? (
+        <Pressable
+          onPress={() => confirmDelete(vm, onDeleted)}
+          disabled={vm.isDeleting}
+          style={styles.delete}
+          accessibilityRole="button"
+        >
+          <Text style={styles.deleteLabel}>
+            {vm.isDeleting ? 'Deleting…' : 'Delete this estimate'}
+          </Text>
+        </Pressable>
+      ) : null}
+
+      {vm.deleteError ? (
+        <Pressable onPress={vm.dismissDeleteError}>
+          <Text style={styles.deleteError}>{vm.deleteError}</Text>
+        </Pressable>
+      ) : null}
     </ScrollView>
   );
 }
@@ -215,6 +257,33 @@ function Row({ label, value, emphasis }: { label: string; value: Money; emphasis
       <Text style={[styles.totalLabel, emphasis && styles.strong]}>{label}</Text>
       <Text style={[styles.totalValue, emphasis && styles.strong]}>{value.format()}</Text>
     </View>
+  );
+}
+
+/**
+ * Deleting asks first and names the estimate, because it does not come back.
+ * Nothing about it is reversible, but nothing about it is costly either — no
+ * sale, no stock, no tax — so the question stays short.
+ */
+function confirmDelete(vm: QuotationDetailViewModel, onDeleted: () => void): void {
+  const quotation = vm.quotation;
+  if (!quotation) return;
+
+  Alert.alert(
+    `Delete ${quotation.quotationNo}?`,
+    'The estimate is removed for good. Nothing was sold and no stock moves, so there is nothing else to undo.',
+    [
+      { text: 'Keep it', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          void vm.deleteQuotation().then((gone) => {
+            if (gone) onDeleted();
+          });
+        },
+      },
+    ],
   );
 }
 
@@ -289,6 +358,9 @@ const styles = StyleSheet.create({
   totalValue: { fontSize: 14, color: theme.text },
   strong: { fontSize: 17, color: theme.text },
   notes: { fontSize: 14, color: theme.textMuted, lineHeight: 20 },
+  delete: { alignSelf: 'center', paddingVertical: 12, paddingHorizontal: 16, marginTop: 16 },
+  deleteLabel: { ...type.body, color: theme.textMuted },
+  deleteError: { ...type.caption, color: theme.danger, textAlign: 'center' },
   terms: { fontSize: 12, color: theme.textMuted, lineHeight: 18 },
 
   convert: {

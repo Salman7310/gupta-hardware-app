@@ -1,6 +1,7 @@
 // Type-only, so building a test container never loads the data layer.
 import type { AppContainer } from '../di/container';
 import { AmendInvoice } from '../services/amend-invoice';
+import { CancelInvoice } from '../services/cancel-invoice';
 import { BackupService } from '../services/backup-service';
 import { BillArchive } from '../services/bill-archive';
 import { CreateInvoice } from '../services/create-invoice';
@@ -78,6 +79,7 @@ export function makeTestContainer(overrides: Partial<AppContainer> = {}): AppCon
     quotationNumbers,
     createInvoice: new CreateInvoice(invoiceRepository, invoiceNumbers, ids, clock, identity),
     amendInvoice: new AmendInvoice(invoiceRepository, ids, clock, identity),
+    cancelInvoice: new CancelInvoice(invoiceRepository, ids, clock, identity),
     createQuotation: new CreateQuotation(
       quotationRepository,
       quotationNumbers,

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Money } from '../core';
 import { useContainer } from '../di/provider';
 import { Customer } from '../models/customer';
-import { Invoice, PaymentState, amountDue, paymentState } from '../models/invoice';
+import { BillState, Invoice, amountDue, billState, isCancelled } from '../models/invoice';
 import { Payment, PaymentMethod } from '../models/payment';
 import { PaymentDraft, PaymentErrors, emptyPaymentDraft } from '../services/payment';
 import { readableBillDiscount, validateLines } from '../services/bill';
@@ -12,7 +12,7 @@ export interface InvoiceDetailViewModel {
   readonly invoice: Invoice | null;
   /** Null when the bill was a walk-in, or the customer has since been removed. */
   readonly customer: Customer | null;
-  readonly state: PaymentState | null;
+  readonly state: BillState | null;
   readonly due: Money | null;
   readonly payments: readonly Payment[];
   readonly isLoading: boolean;
@@ -56,6 +56,19 @@ export interface InvoiceDetailViewModel {
   confirmAddedItems(): Promise<boolean>;
   saveBill(): Promise<void>;
   dismissFileNotice(): void;
+
+  /**
+   * Cancelling the bill.
+   *
+   * `isCancelled` drives the screen rather than being asked for separately,
+   * because a cancelled bill must stop offering everything that would change
+   * it: no more items, no more payments.
+   */
+  readonly isCancelled: boolean;
+  readonly isCancelling: boolean;
+  readonly cancelError: string | null;
+  cancelBill(): Promise<boolean>;
+  dismissCancelError(): void;
 }
 
 /**
@@ -66,8 +79,14 @@ export interface InvoiceDetailViewModel {
  * the total less the receipts recorded so far.
  */
 export function useInvoiceDetailViewModel(invoiceId: string): InvoiceDetailViewModel {
-  const { invoiceRepository, customerRepository, paymentBook, billArchive, amendInvoice } =
-    useContainer();
+  const {
+    invoiceRepository,
+    customerRepository,
+    paymentBook,
+    billArchive,
+    amendInvoice,
+    cancelInvoice,
+  } = useContainer();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [payments, setPayments] = useState<readonly Payment[]>([]);
@@ -92,6 +111,8 @@ export function useInvoiceDetailViewModel(invoiceId: string): InvoiceDetailViewM
   const [isAdding, setIsAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [isSavingItems, setIsSavingItems] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
   // The bill's own lump-sum discount is re-spread over the new lines when the
   // bill is recalculated, so the running total shown while typing uses it too.
   const billDiscount = useMemo(
@@ -286,11 +307,31 @@ export function useInvoiceDetailViewModel(invoiceId: string): InvoiceDetailViewM
     setFileError(null);
   }, []);
 
+  const cancelBill = useCallback(async (): Promise<boolean> => {
+    if (!invoice) return false;
+    setIsCancelling(true);
+    try {
+      const result = await cancelInvoice.execute(invoice);
+      if (!result.ok) {
+        setCancelError(result.error.message);
+        return false;
+      }
+      setCancelError(null);
+      // Read it back: the stock it took has gone the other way too.
+      setRevision((n) => n + 1);
+      return true;
+    } finally {
+      setIsCancelling(false);
+    }
+  }, [invoice, cancelInvoice]);
+
+  const dismissCancelError = useCallback(() => setCancelError(null), []);
+
   return useMemo(
     () => ({
       invoice,
       customer,
-      state: invoice ? paymentState(invoice) : null,
+      state: invoice ? billState(invoice) : null,
       due: invoice ? amountDue(invoice) : null,
       payments,
       isLoading,
@@ -322,8 +363,17 @@ export function useInvoiceDetailViewModel(invoiceId: string): InvoiceDetailViewM
       startAddingItems,
       cancelAddingItems,
       confirmAddedItems,
+      isCancelled: invoice ? isCancelled(invoice) : false,
+      isCancelling,
+      cancelError,
+      cancelBill,
+      dismissCancelError,
     }),
     [
+      isCancelling,
+      cancelError,
+      cancelBill,
+      dismissCancelError,
       isSharing,
       isWhatsApping,
       canWhatsApp,

@@ -104,6 +104,7 @@ export function anInvoice(over: Partial<Invoice> = {}): Invoice {
     paid: Money.zero,
     notes: null,
     amendedAt: null,
+    cancelledAt: null,
     items: [anInvoiceItem()],
     ...over,
   };

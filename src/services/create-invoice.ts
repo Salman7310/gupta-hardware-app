@@ -125,6 +125,7 @@ export class CreateInvoice {
       paid: input.paid,
       notes: input.notes,
       amendedAt: null,
+      cancelledAt: null,
       items,
     };
 

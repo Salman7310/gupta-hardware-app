@@ -76,6 +76,12 @@ export const invoices = sqliteTable(
     notes: text('notes'),
     /** Set when items were added to a bill that had already been issued. */
     amendedAt: integer('amended_at'),
+    /**
+     * Set when the bill was cancelled. The row is never removed and never
+     * gets a `deletedAt`: a tax invoice number has to stay in the series, so
+     * a cancelled bill keeps its place in the book and shows as cancelled.
+     */
+    cancelledAt: integer('cancelled_at'),
     ...syncColumns,
   },
   (t) => [index('invoices_shop_issued_idx').on(t.shopId, t.issuedAt)],

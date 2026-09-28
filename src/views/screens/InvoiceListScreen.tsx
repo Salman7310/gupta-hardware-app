@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { PaymentState } from '../../models/invoice';
+import { BillState } from '../../models/invoice';
 import { InvoiceListItem, useInvoiceListViewModel } from '../../viewmodels/useInvoiceListViewModel';
 import { formatDate, formatTime } from '../format';
 import { card, elevation, radius, size, space, theme, type } from '../theme';
@@ -85,30 +85,39 @@ function Body({
 
 function Row({ item, onPress }: { item: InvoiceListItem; onPress: () => void }) {
   const { invoice } = item;
+  // A cancelled bill stays in the list so the number series reads unbroken,
+  // but it should be obvious at a glance that it is not a live sale.
+  const struck = item.state === 'cancelled' ? styles.struck : null;
 
   return (
     <Pressable style={styles.row} onPress={onPress} accessibilityRole="button">
       <View style={styles.rowMain}>
-        <Text style={styles.customer} numberOfLines={1}>
+        <Text style={[styles.customer, struck]} numberOfLines={1}>
           {item.customerName ?? 'Walk-in'}
         </Text>
-        <Text style={styles.number}>{invoice.invoiceNo}</Text>
+        <Text style={[styles.number, struck]}>{invoice.invoiceNo}</Text>
         <Text style={styles.when}>
           {formatDate(invoice.issuedAt)} · {formatTime(invoice.issuedAt)} · {invoice.items.length}{' '}
           {invoice.items.length === 1 ? 'item' : 'items'}
         </Text>
       </View>
       <View style={styles.rowSide}>
-        <Text style={styles.total}>{invoice.grandTotal.format()}</Text>
+        <Text style={[styles.total, struck]}>{invoice.grandTotal.format()}</Text>
         <PaymentBadge state={item.state} />
       </View>
     </Pressable>
   );
 }
 
-export function PaymentBadge({ state }: { state: PaymentState }) {
-  const label = state === 'paid' ? 'Paid' : state === 'partial' ? 'Part paid' : 'Unpaid';
-  return <Text style={[styles.badge, styles[state]]}>{label}</Text>;
+const BADGE_LABEL: Record<BillState, string> = {
+  paid: 'Paid',
+  partial: 'Part paid',
+  unpaid: 'Unpaid',
+  cancelled: 'Cancelled',
+};
+
+export function PaymentBadge({ state }: { state: BillState }) {
+  return <Text style={[styles.badge, styles[state]]}>{BADGE_LABEL[state]}</Text>;
 }
 
 const styles = StyleSheet.create({
@@ -168,4 +177,8 @@ const styles = StyleSheet.create({
   paid: { color: theme.accentInk, backgroundColor: theme.accentSurface },
   partial: { color: theme.warningText, backgroundColor: theme.warningBg },
   unpaid: { color: theme.danger, backgroundColor: theme.dangerSurface },
+  struck: { textDecorationLine: 'line-through', color: theme.textMuted },
+  // Grey, not red: a cancelled bill is finished business, not a problem to
+  // chase. It should recede next to the bills that still want attention.
+  cancelled: { color: theme.textMuted, backgroundColor: theme.surfaceSunken },
 });

@@ -65,6 +65,7 @@ export function toInvoice(
     paid: Money.fromPaise(paidPaise),
     notes: row.notes,
     amendedAt: row.amendedAt,
+    cancelledAt: row.cancelledAt,
     items: items.map(toInvoiceItem),
   };
 }
@@ -87,6 +88,7 @@ export function toInvoiceRow(invoice: Invoice, deviceId: string): InvoiceInsert 
     // Deliberately not written: the payments ledger owns what has been paid.
     notes: invoice.notes,
     amendedAt: invoice.amendedAt,
+    cancelledAt: invoice.cancelledAt,
     deviceId,
     updatedAt: invoice.issuedAt,
     deletedAt: null,

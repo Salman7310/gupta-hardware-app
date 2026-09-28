@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Money } from '../core';
 import { useContainer } from '../di/provider';
-import { Invoice, PaymentState, amountDue, paymentState } from '../models/invoice';
+import { BillState, Invoice, amountDue, billState } from '../models/invoice';
 
 const RECENT_LIMIT = 50;
 
 export interface InvoiceListItem {
   readonly invoice: Invoice;
-  readonly state: PaymentState;
+  readonly state: BillState;
   readonly due: Money;
   /**
    * Null for a walk-in. Shown beside the bill number because that is how the
@@ -55,7 +55,7 @@ export function useInvoiceListViewModel(): InvoiceListViewModel {
         setItems(
           invoices.map((invoice) => ({
             invoice,
-            state: paymentState(invoice),
+            state: billState(invoice),
             due: amountDue(invoice),
             customerName: invoice.customerId ? (names.get(invoice.customerId) ?? null) : null,
           })),

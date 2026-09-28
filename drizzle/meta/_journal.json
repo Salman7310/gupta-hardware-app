@@ -43,6 +43,13 @@
       "when": 1790575964794,
       "tag": "0005_aspiring_tattoo",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1790581201905,
+      "tag": "0006_majestic_the_santerians",
+      "breakpoints": true
     }
   ]
 }

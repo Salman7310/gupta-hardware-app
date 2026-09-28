@@ -29,6 +29,18 @@ export interface QuotationDetailViewModel {
   sendOnWhatsApp(): Promise<void>;
   saveQuotation(): Promise<void>;
   dismissFileNotice(): void;
+
+  /**
+   * Deleting the estimate.
+   *
+   * Refused once it has become a bill, so the screen asks the viewmodel
+   * rather than working it out from `status` itself.
+   */
+  readonly canDelete: boolean;
+  readonly isDeleting: boolean;
+  readonly deleteError: string | null;
+  deleteQuotation(): Promise<boolean>;
+  dismissDeleteError(): void;
 }
 
 /**
@@ -51,6 +63,8 @@ export function useQuotationDetailViewModel(quotationId: string): QuotationDetai
   const [isSavingPdf, setIsSavingPdf] = useState(false);
   const [savedTo, setSavedTo] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -147,6 +161,24 @@ export function useQuotationDetailViewModel(quotationId: string): QuotationDetai
     setFileError(null);
   }, []);
 
+  const deleteQuotation = useCallback(async (): Promise<boolean> => {
+    if (!quotation) return false;
+    setIsDeleting(true);
+    try {
+      const result = await quotations.remove(quotation);
+      if (!result.ok) {
+        setDeleteError(result.error.message);
+        return false;
+      }
+      setDeleteError(null);
+      return true;
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [quotation, quotations]);
+
+  const dismissDeleteError = useCallback(() => setDeleteError(null), []);
+
   return useMemo(
     () => ({
       quotation,
@@ -166,6 +198,11 @@ export function useQuotationDetailViewModel(quotationId: string): QuotationDetai
       sendOnWhatsApp,
       saveQuotation,
       dismissFileNotice,
+      canDelete: quotation ? quotation.acceptedInvoiceId === null : false,
+      isDeleting,
+      deleteError,
+      deleteQuotation,
+      dismissDeleteError,
     }),
     [
       quotation,
@@ -184,6 +221,10 @@ export function useQuotationDetailViewModel(quotationId: string): QuotationDetai
       shareQuotation,
       saveQuotation,
       dismissFileNotice,
+      isDeleting,
+      deleteError,
+      deleteQuotation,
+      dismissDeleteError,
     ],
   );
 }
