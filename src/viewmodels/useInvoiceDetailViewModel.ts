@@ -5,6 +5,8 @@ import { Customer } from '../models/customer';
 import { Invoice, PaymentState, amountDue, paymentState } from '../models/invoice';
 import { Payment, PaymentMethod } from '../models/payment';
 import { PaymentDraft, PaymentErrors, emptyPaymentDraft } from '../services/payment';
+import { readableBillDiscount, validateLines } from '../services/bill';
+import { LineEntry, useLineEntry } from './useLineEntry';
 
 export interface InvoiceDetailViewModel {
   readonly invoice: Invoice | null;
@@ -37,6 +39,21 @@ export interface InvoiceDetailViewModel {
   readonly fileError: string | null;
   shareBill(): Promise<void>;
   sendOnWhatsApp(): Promise<void>;
+
+  /**
+   * Adding to a bill the customer already has.
+   *
+   * The lines being added are typed through the same entry hook as a new
+   * bill, and are held apart from the invoice until they are saved — a
+   * half-typed row must never touch a bill that has been issued.
+   */
+  readonly isAdding: boolean;
+  readonly adding: LineEntry;
+  readonly addError: string | null;
+  readonly isSavingItems: boolean;
+  startAddingItems(): void;
+  cancelAddingItems(): void;
+  confirmAddedItems(): Promise<boolean>;
   saveBill(): Promise<void>;
   dismissFileNotice(): void;
 }
@@ -49,7 +66,8 @@ export interface InvoiceDetailViewModel {
  * the total less the receipts recorded so far.
  */
 export function useInvoiceDetailViewModel(invoiceId: string): InvoiceDetailViewModel {
-  const { invoiceRepository, customerRepository, paymentBook, billArchive } = useContainer();
+  const { invoiceRepository, customerRepository, paymentBook, billArchive, amendInvoice } =
+    useContainer();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [payments, setPayments] = useState<readonly Payment[]>([]);
@@ -70,6 +88,18 @@ export function useInvoiceDetailViewModel(invoiceId: string): InvoiceDetailViewM
   // rather than patching the figures held here. The amount due is arithmetic
   // over stored rows, and recomputing it in the view is how the two drift.
   const [revision, setRevision] = useState(0);
+
+  const [isAdding, setIsAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [isSavingItems, setIsSavingItems] = useState(false);
+  // The bill's own lump-sum discount is re-spread over the new lines when the
+  // bill is recalculated, so the running total shown while typing uses it too.
+  const billDiscount = useMemo(
+    () => readableBillDiscount(invoice ? invoice.billDiscount.toPlainString() : ''),
+    [invoice],
+  );
+  const adding = useLineEntry(billDiscount);
+  const { replaceAll } = adding;
 
   useEffect(() => {
     let cancelled = false;
@@ -207,6 +237,50 @@ export function useInvoiceDetailViewModel(invoiceId: string): InvoiceDetailViewM
     }
   }, [billArchive, invoice, customer, payments]);
 
+  const startAddingItems = useCallback(() => {
+    replaceAll([]);
+    setAddError(null);
+    setIsAdding(true);
+  }, [replaceAll]);
+
+  const cancelAddingItems = useCallback(() => {
+    setIsAdding(false);
+    setAddError(null);
+    replaceAll([]);
+  }, [replaceAll]);
+
+  const confirmAddedItems = useCallback(async (): Promise<boolean> => {
+    if (!invoice) return false;
+
+    const { errors, parsed } = validateLines(adding.lines);
+    if (Object.keys(errors).length > 0) {
+      setAddError('Finish the lines that are not complete.');
+      return false;
+    }
+    if (parsed.length === 0) {
+      setAddError('Add at least one item.');
+      return false;
+    }
+
+    setIsSavingItems(true);
+    try {
+      const result = await amendInvoice.execute(invoice, parsed);
+      if (!result.ok) {
+        setAddError(result.error.message);
+        return false;
+      }
+      setIsAdding(false);
+      setAddError(null);
+      replaceAll([]);
+      // Read the bill back rather than trusting what was returned: the totals
+      // and every line's share of the discount have moved.
+      setRevision((n) => n + 1);
+      return true;
+    } finally {
+      setIsSavingItems(false);
+    }
+  }, [invoice, adding.lines, amendInvoice, replaceAll]);
+
   const dismissFileNotice = useCallback(() => {
     setSavedTo(null);
     setFileError(null);
@@ -241,6 +315,13 @@ export function useInvoiceDetailViewModel(invoiceId: string): InvoiceDetailViewM
       sendOnWhatsApp,
       saveBill,
       dismissFileNotice,
+      isAdding,
+      adding,
+      addError,
+      isSavingItems,
+      startAddingItems,
+      cancelAddingItems,
+      confirmAddedItems,
     }),
     [
       isSharing,
@@ -268,6 +349,13 @@ export function useInvoiceDetailViewModel(invoiceId: string): InvoiceDetailViewM
       setMethod,
       setNote,
       record,
+      isAdding,
+      adding,
+      addError,
+      isSavingItems,
+      startAddingItems,
+      cancelAddingItems,
+      confirmAddedItems,
     ],
   );
 }

@@ -74,6 +74,8 @@ export const invoices = sqliteTable(
      */
     paidPaise: integer('paid_paise').notNull().default(0),
     notes: text('notes'),
+    /** Set when items were added to a bill that had already been issued. */
+    amendedAt: integer('amended_at'),
     ...syncColumns,
   },
   (t) => [index('invoices_shop_issued_idx').on(t.shopId, t.issuedAt)],

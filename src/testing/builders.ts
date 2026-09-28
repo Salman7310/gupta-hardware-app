@@ -103,6 +103,7 @@ export function anInvoice(over: Partial<Invoice> = {}): Invoice {
     grandTotal: Money.fromRupees(4316),
     paid: Money.zero,
     notes: null,
+    amendedAt: null,
     items: [anInvoiceItem()],
     ...over,
   };

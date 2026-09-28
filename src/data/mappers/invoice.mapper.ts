@@ -64,6 +64,7 @@ export function toInvoice(
     grandTotal: Money.fromPaise(row.grandTotalPaise),
     paid: Money.fromPaise(paidPaise),
     notes: row.notes,
+    amendedAt: row.amendedAt,
     items: items.map(toInvoiceItem),
   };
 }
@@ -85,6 +86,7 @@ export function toInvoiceRow(invoice: Invoice, deviceId: string): InvoiceInsert 
     grandTotalPaise: invoice.grandTotal.paise,
     // Deliberately not written: the payments ledger owns what has been paid.
     notes: invoice.notes,
+    amendedAt: invoice.amendedAt,
     deviceId,
     updatedAt: invoice.issuedAt,
     deletedAt: null,

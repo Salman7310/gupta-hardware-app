@@ -51,6 +51,16 @@ export interface InvoiceRepository {
    * recency window would hide.
    */
   listUnsettled(): Promise<Invoice[]>;
+  /**
+   * Adds items to a bill already issued.
+   *
+   * Takes the whole recalculated invoice rather than just the new lines,
+   * because a lump sum off the bottom of the bill is apportioned across every
+   * line: adding one changes what the others came to. Existing rows keep
+   * their ids and are updated in place, so nothing is hard deleted and the
+   * bill's lines can still be reconciled against a copy the customer holds.
+   */
+  amend(invoice: Invoice, addedMovements: readonly StockMovement[]): Promise<void>;
 }
 
 /**

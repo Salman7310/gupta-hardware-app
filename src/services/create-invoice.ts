@@ -124,6 +124,7 @@ export class CreateInvoice {
       grandTotal: totals.grandTotal,
       paid: input.paid,
       notes: input.notes,
+      amendedAt: null,
       items,
     };
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -15,6 +15,8 @@ import { InvoiceItem } from '../../models/invoice';
 import { PAYMENT_METHODS, Payment, paymentMethodLabel } from '../../models/payment';
 import { InvoiceDetailViewModel, useInvoiceDetailViewModel } from '../../viewmodels/useInvoiceDetailViewModel';
 import { ChipSelector } from '../components/ChipSelector';
+import { AddItem, LineEntryRow, SaveBar, TotalRow } from '../components/LineEntry';
+import { ProductPicker } from '../components/ProductPicker';
 import { space, theme, type } from '../theme';
 import { PaymentBadge } from './InvoiceListScreen';
 
@@ -120,6 +122,19 @@ export function InvoiceDetailScreen({ invoiceId }: Props) {
           {invoice.items.map((item) => (
             <Line key={item.id} item={item} />
           ))}
+          <Pressable
+            onPress={vm.startAddingItems}
+            style={styles.recordButton}
+            accessibilityRole="button"
+          >
+            <Text style={styles.recordLabel}>+ Add more items to this bill</Text>
+          </Pressable>
+          {invoice.amendedAt ? (
+            <Text style={styles.amended}>
+              Items were added on {formatDate(invoice.amendedAt)} at{' '}
+              {formatTime(invoice.amendedAt)}. The bill now shows the full amount.
+            </Text>
+          ) : null}
         </View>
 
         <View style={styles.card}>
@@ -171,7 +186,85 @@ export function InvoiceDetailScreen({ invoiceId }: Props) {
       >
         <RecordPayment vm={vm} />
       </Modal>
+
+      <Modal visible={vm.isAdding} animationType="slide" onRequestClose={vm.cancelAddingItems}>
+        <AddItemsSheet vm={vm} />
+      </Modal>
     </>
+  );
+}
+
+/**
+ * Adding to a bill already issued, typed through the same rows as a new bill
+ * so the shop is not learning a second way to enter an item.
+ */
+function AddItemsSheet({ vm }: { vm: InvoiceDetailViewModel }) {
+  const insets = useSafeAreaInsets();
+  const [isPicking, setIsPicking] = useState(false);
+  const { adding } = vm;
+
+  return (
+    <View style={[styles.sheet, { paddingTop: insets.top + space.lg }]}>
+      <View style={styles.sheetHead}>
+        <Text style={styles.sheetTitle}>Add to this bill</Text>
+        <Pressable onPress={vm.cancelAddingItems} accessibilityRole="button" hitSlop={12}>
+          <Text style={styles.sheetAction}>Cancel</Text>
+        </Pressable>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+        <Text style={styles.addHint}>
+          {vm.invoice?.invoiceNo} keeps its number. The total and the GST are worked out again
+          over every item, and what is still owed goes up by what you add.
+        </Text>
+
+        {adding.isEmpty ? (
+          <Text style={styles.addEmpty}>Nothing added yet.</Text>
+        ) : (
+          adding.lines.map((line) => (
+            <LineEntryRow
+              key={line.key}
+              line={line}
+              total={adding.lineTotals[line.key]?.total ?? null}
+              onChange={(field, value) => adding.setLineField(line.key, field, value)}
+              onRemove={() => adding.removeLine(line.key)}
+              onDimensionChange={(dimensionKey, field, value) =>
+                adding.setDimensionField(line.key, dimensionKey, field, value)
+              }
+              onAddDimension={() => adding.addDimension(line.key)}
+              onRemoveDimension={(dimensionKey) => adding.removeDimension(line.key, dimensionKey)}
+              onToggleMeasuring={(measured) => adding.setMeasuring(line.key, measured)}
+            />
+          ))
+        )}
+
+        <AddItem onPress={() => setIsPicking(true)} />
+
+        {adding.isEmpty ? null : (
+          <View style={styles.card}>
+            <TotalRow label="Adding" value={adding.totals.grandTotal} emphasis />
+          </View>
+        )}
+
+        {vm.addError ? <Text style={styles.fieldError}>{vm.addError}</Text> : null}
+      </ScrollView>
+
+      <SaveBar
+        label={vm.isSavingItems ? 'Adding…' : 'Add to bill'}
+        onPress={() => void vm.confirmAddedItems()}
+        disabled={vm.isSavingItems || adding.isEmpty}
+      />
+
+      <Modal visible={isPicking} animationType="slide" onRequestClose={() => setIsPicking(false)}>
+        <ProductPicker
+          onPick={(product) => {
+            adding.addProduct(product);
+            setIsPicking(false);
+          }}
+          onClose={() => setIsPicking(false)}
+        />
+      </Modal>
+    </View>
   );
 }
 
@@ -397,6 +490,9 @@ const styles = StyleSheet.create({
   receiptWhen: { fontSize: 14, color: theme.text },
   receiptHow: { fontSize: 12, color: theme.textMuted, marginTop: 2 },
   settled: { fontSize: 13, color: theme.accentInk },
+  amended: { ...type.caption, color: theme.textMuted, lineHeight: 20 },
+  addHint: { ...type.caption, color: theme.textMuted, lineHeight: 20 },
+  addEmpty: { ...type.body, color: theme.textMuted, textAlign: 'center', paddingVertical: space.lg },
   recordButton: {
     height: 46,
     borderRadius: 10,

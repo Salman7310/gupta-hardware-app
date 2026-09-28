@@ -1,3 +1,4 @@
+import { AmendInvoice } from '../services/amend-invoice';
 import { BackupService } from '../services/backup-service';
 import { BillArchive } from '../services/bill-archive';
 import { CreateInvoice } from '../services/create-invoice';
@@ -56,6 +57,7 @@ export interface AppContainer extends PlatformServices {
   readonly invoiceNumbers: InvoiceNumberService;
   readonly quotationNumbers: QuotationNumberService;
   readonly createInvoice: CreateInvoice;
+  readonly amendInvoice: AmendInvoice;
   readonly createQuotation: CreateQuotation;
   readonly catalogue: ProductCatalogue;
   readonly customers: CustomerBook;
@@ -108,6 +110,7 @@ export function createContainer(
       platform.clock,
       identity,
     ),
+    amendInvoice: new AmendInvoice(invoiceRepository, platform.ids, platform.clock, identity),
     createQuotation: new CreateQuotation(
       quotationRepository,
       quotationNumbers,

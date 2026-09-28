@@ -128,6 +128,57 @@ export class DrizzleInvoiceRepository implements InvoiceRepository {
   }
 
   /**
+   * Adds to a bill already issued: the totals change, every line is rewritten
+   * because a bill-level discount is spread across all of them, and the new
+   * lines take stock off the shelf.
+   *
+   * One transaction, for the same reason `create` is: a bill whose totals
+   * moved but whose stock did not is books that will not reconcile.
+   */
+  async amend(invoice: Invoice, addedMovements: readonly StockMovement[]): Promise<void> {
+    const existing = await this.db
+      .select({ id: invoiceItems.id })
+      .from(invoiceItems)
+      .where(eq(invoiceItems.invoiceId, invoice.id));
+    const known = new Set(existing.map((row) => row.id));
+
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(invoices)
+        .set({
+          subtotalPaise: invoice.subtotal.paise,
+          discountPaise: invoice.discount.paise,
+          billDiscountPaise: invoice.billDiscount.paise,
+          taxablePaise: invoice.taxable.paise,
+          cgstPaise: invoice.cgst.paise,
+          sgstPaise: invoice.sgst.paise,
+          roundOffPaise: invoice.roundOff.paise,
+          grandTotalPaise: invoice.grandTotal.paise,
+          amendedAt: invoice.amendedAt,
+          updatedAt: invoice.amendedAt ?? invoice.issuedAt,
+          deviceId: this.deviceId,
+        })
+        .where(and(this.scope, eq(invoices.id, invoice.id)));
+
+      for (const item of invoice.items) {
+        const row = toInvoiceItemRow(item, this.shopId, this.deviceId);
+        if (known.has(item.id)) {
+          // Updated rather than replaced: a row that is deleted cannot sync,
+          // and the line is the same line — only its share of the discount
+          // and its total have moved.
+          await tx.update(invoiceItems).set(row).where(eq(invoiceItems.id, item.id));
+        } else {
+          await tx.insert(invoiceItems).values(row);
+        }
+      }
+
+      for (const movement of addedMovements) {
+        await tx.insert(stockMovements).values(toStockMovementRow(movement, this.deviceId));
+      }
+    });
+  }
+
+  /**
    * One transaction for the invoice, its lines and the stock it consumed. A
    * bill that reduced stock but did not save, or saved without reducing stock,
    * leaves the shopkeeper with books that do not reconcile.

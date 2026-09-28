@@ -224,6 +224,7 @@ describe('CreateInvoice', () => {
       findById: async () => null,
       listRecent: async () => [],
       listUnsettled: async () => [],
+    amend: async () => undefined,
       create: async () => {
         throw new Error('database is locked');
       },

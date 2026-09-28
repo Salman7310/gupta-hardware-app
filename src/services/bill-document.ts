@@ -82,6 +82,11 @@ export function renderBillHtml(doc: BillDocument): string {
         <div class="doc-kind">Tax invoice</div>
         <div class="doc-no">${escape(invoice.invoiceNo)}</div>
         <div class="muted num">${escape(formatDate(invoice.issuedAt))} · ${escape(formatTime(invoice.issuedAt))}</div>
+        ${
+          invoice.amendedAt
+            ? `<div class="muted num">Items added ${escape(formatDate(invoice.amendedAt))} · ${escape(formatTime(invoice.amendedAt))}</div>`
+            : ''
+        }
         <div class="num"><span class="status${settled}">${STATUS_WORD[status]}</span></div>
       </div>
     </header>

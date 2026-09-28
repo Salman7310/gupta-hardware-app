@@ -6,6 +6,7 @@ import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/libsql';
 import { Money, Quantity, inchesFromFeet } from '../../core';
 import { Invoice, LineItemInput } from '../../models/invoice';
+import { AmendInvoice } from '../../services/amend-invoice';
 import { CreateInvoice } from '../../services/create-invoice';
 import { Identity } from '../../services/identity';
 import { InvoiceNumberService } from '../../services/invoice-number';
@@ -73,7 +74,14 @@ async function build() {
     identity,
   );
 
-  return { db, products, stock, invoices, settings, createInvoice };
+  const amendInvoice = new AmendInvoice(
+    invoices,
+    new SequentialIdGenerator('add'),
+    fixedClock(NOW + 600_000),
+    identity,
+  );
+
+  return { db, products, stock, invoices, settings, createInvoice, amendInvoice };
 }
 
 const lineFor = (over: Partial<LineItemInput> = {}): LineItemInput => ({
@@ -256,5 +264,70 @@ describe('CreateInvoice against a real database', () => {
     expect(rows[0].c).toBe(1);
     // 10 opening less the 2 sold. The -99 never landed.
     expect(await stock.stockFor('product-1')).toBe(8);
+  });
+});
+
+
+/**
+ * Amending rewrites every line, because a bill-level discount is spread
+ * across all of them. Against a real database that means existing rows are
+ * updated in place while new ones are inserted — the fakes cannot show
+ * whether that actually happened.
+ */
+describe('adding to a bill against a real database', () => {
+  const putty = (): LineItemInput =>
+    lineFor({
+      productId: 'product-2',
+      name: 'Birla White Putty 40kg',
+      quantity: Quantity.of(3, 'bag'),
+      rate: Money.fromRupees(1450),
+    });
+
+  it('keeps one row per line rather than duplicating the originals', async () => {
+    const { createInvoice, amendInvoice, invoices } = await build();
+    const written = await createInvoice.execute(billOf([lineFor()], Money.fromRupees(100)));
+    if (!written.ok) throw new Error('should have been written');
+
+    await amendInvoice.execute(written.value, [putty()]);
+
+    const read = await invoices.findById(written.value.id);
+    expect(read?.items).toHaveLength(2);
+    // The original line keeps its id: updated, not replaced and re-inserted.
+    expect(read?.items.map((i) => i.id)).toContain(written.value.items[0].id);
+  });
+
+  it('writes the new totals and the amendment date', async () => {
+    const { createInvoice, amendInvoice, invoices } = await build();
+    const written = await createInvoice.execute(billOf([lineFor()]));
+    if (!written.ok) throw new Error('should have been written');
+
+    const amended = await amendInvoice.execute(written.value, [putty()]);
+    if (!amended.ok) throw new Error('should have been amended');
+
+    const read = await invoices.findById(written.value.id);
+    expect(read?.grandTotal.paise).toBe(amended.value.grandTotal.paise);
+    expect(read?.subtotal.paise).toBe(525_000);
+    expect(read?.amendedAt).toBe(NOW + 600_000);
+  });
+
+  it('moves the stock for the added line only', async () => {
+    const { createInvoice, amendInvoice, stock } = await build();
+    const written = await createInvoice.execute(billOf([lineFor()]));
+    if (!written.ok) throw new Error('should have been written');
+
+    await amendInvoice.execute(written.value, [putty()]);
+
+    expect(await stock.stockFor('product-1')).toBe(-2);
+    expect(await stock.stockFor('product-2')).toBe(-3);
+  });
+
+  it('still shows as one bill in the list', async () => {
+    const { createInvoice, amendInvoice, invoices } = await build();
+    const written = await createInvoice.execute(billOf([lineFor()]));
+    if (!written.ok) throw new Error('should have been written');
+
+    await amendInvoice.execute(written.value, [putty()]);
+
+    expect(await invoices.listRecent(50)).toHaveLength(1);
   });
 });

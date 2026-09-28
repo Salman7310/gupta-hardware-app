@@ -36,6 +36,13 @@
       "when": 1790248251030,
       "tag": "0004_sparkling_kylun",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1790575964794,
+      "tag": "0005_aspiring_tattoo",
+      "breakpoints": true
     }
   ]
 }

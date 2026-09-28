@@ -86,7 +86,28 @@ export interface Invoice {
   readonly grandTotal: Money;
   readonly paid: Money;
   readonly notes: string | null;
+  /**
+   * When items were last added to a bill that had already been issued.
+   *
+   * Null for the overwhelming majority, which are written once and never
+   * touched. Stored rather than inferred because the customer may be holding
+   * a PDF printed before the change, and the shop — and its accountant —
+   * should be able to see that the bill grew after it was first made.
+   */
+  readonly amendedAt: number | null;
   readonly items: readonly InvoiceItem[];
+}
+
+/** The line as it would be re-entered, for recalculating an amended bill. */
+export function toLineInput(item: InvoiceItem): LineItemInput {
+  return {
+    productId: item.productId ?? '',
+    name: item.name,
+    quantity: item.quantity,
+    rate: item.rate,
+    taxRateBps: item.taxRateBps,
+    discountBps: item.discountBps,
+  };
 }
 
 export function paymentState(invoice: Invoice): PaymentState {

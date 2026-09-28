@@ -1,0 +1,1 @@
+ALTER TABLE `invoices` ADD `amended_at` integer;

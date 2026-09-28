@@ -157,6 +157,13 @@ export class InMemoryInvoiceRepository implements InvoiceRepository {
     return all.filter((i) => i.paid.compare(i.grandTotal) < 0);
   }
 
+  async amend(invoice: Invoice, addedMovements: readonly StockMovement[]): Promise<void> {
+    const index = this.invoices.findIndex((i) => i.id === invoice.id);
+    if (index < 0) throw new Error(`no bill ${invoice.id} to amend`);
+    this.invoices[index] = invoice;
+    for (const movement of addedMovements) await this.stock.append(movement);
+  }
+
   async create(
     invoice: Invoice,
     movements: readonly StockMovement[],
