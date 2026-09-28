@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useLayoutEffect } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -8,13 +8,11 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useNavigation } from 'expo-router';
 import { Money, formatDate } from '../../core';
-import { QuotationItem } from '../../models/quotation';
-import {
-  QuotationDetailViewModel,
-  useQuotationDetailViewModel,
-} from '../../viewmodels/useQuotationDetailViewModel';
+import { Quotation, QuotationItem } from '../../models/quotation';
+import { useQuotationDetailViewModel } from '../../viewmodels/useQuotationDetailViewModel';
+import { HeaderMenu } from '../components/HeaderMenu';
 import { QuotationBadge } from './QuotationListScreen';
 import { theme, type } from '../theme';
 
@@ -40,7 +38,29 @@ export function QuotationDetailScreen({
   onDeleted,
 }: Props) {
   const vm = useQuotationDetailViewModel(quotationId);
-  const { refresh } = vm;
+  const { refresh, canDelete, deleteQuotation } = vm;
+  // Named apart from the narrowed `quotation` the body uses after its guard.
+  const headerQuotation = vm.quotation;
+  const navigation = useNavigation();
+
+  // In the header, for the same reason as on a bill: at the foot of the screen
+  // it is below the fold on any estimate with more than a couple of lines.
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () =>
+        headerQuotation && canDelete ? (
+          <HeaderMenu
+            actions={[
+              {
+                label: 'Delete this estimate',
+                destructive: true,
+                onPress: () => confirmDelete(headerQuotation, deleteQuotation, onDeleted),
+              },
+            ]}
+          />
+        ) : null,
+    });
+  }, [navigation, headerQuotation, canDelete, deleteQuotation, onDeleted]);
 
   // Billing this quotation happens on the screen after this one, so what came
   // back is stale by the time it is seen again. Depends on the stable command,
@@ -175,24 +195,6 @@ export function QuotationDetailScreen({
         tax has been charged.
       </Text>
 
-      {/*
-        Offered plainly, because deleting an estimate is genuinely low stakes —
-        nothing was sold and no tax was charged. It still asks first, since the
-        estimate cannot be brought back.
-      */}
-      {vm.canDelete ? (
-        <Pressable
-          onPress={() => confirmDelete(vm, onDeleted)}
-          disabled={vm.isDeleting}
-          style={styles.delete}
-          accessibilityRole="button"
-        >
-          <Text style={styles.deleteLabel}>
-            {vm.isDeleting ? 'Deleting…' : 'Delete this estimate'}
-          </Text>
-        </Pressable>
-      ) : null}
-
       {vm.deleteError ? (
         <Pressable onPress={vm.dismissDeleteError}>
           <Text style={styles.deleteError}>{vm.deleteError}</Text>
@@ -265,10 +267,11 @@ function Row({ label, value, emphasis }: { label: string; value: Money; emphasis
  * Nothing about it is reversible, but nothing about it is costly either — no
  * sale, no stock, no tax — so the question stays short.
  */
-function confirmDelete(vm: QuotationDetailViewModel, onDeleted: () => void): void {
-  const quotation = vm.quotation;
-  if (!quotation) return;
-
+function confirmDelete(
+  quotation: Quotation,
+  deleteQuotation: () => Promise<boolean>,
+  onDeleted: () => void,
+): void {
   Alert.alert(
     `Delete ${quotation.quotationNo}?`,
     'The estimate is removed for good. Nothing was sold and no stock moves, so there is nothing else to undo.',
@@ -278,7 +281,7 @@ function confirmDelete(vm: QuotationDetailViewModel, onDeleted: () => void): voi
         text: 'Delete',
         style: 'destructive',
         onPress: () => {
-          void vm.deleteQuotation().then((gone) => {
+          void deleteQuotation().then((gone) => {
             if (gone) onDeleted();
           });
         },
@@ -358,8 +361,6 @@ const styles = StyleSheet.create({
   totalValue: { fontSize: 14, color: theme.text },
   strong: { fontSize: 17, color: theme.text },
   notes: { fontSize: 14, color: theme.textMuted, lineHeight: 20 },
-  delete: { alignSelf: 'center', paddingVertical: 12, paddingHorizontal: 16, marginTop: 16 },
-  deleteLabel: { ...type.body, color: theme.textMuted },
   deleteError: { ...type.caption, color: theme.danger, textAlign: 'center' },
   terms: { fontSize: 12, color: theme.textMuted, lineHeight: 18 },
 

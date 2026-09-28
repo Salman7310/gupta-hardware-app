@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useLayoutEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,12 +10,14 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Money, formatDate, formatTime } from '../../core';
-import { InvoiceItem } from '../../models/invoice';
+import { Invoice, InvoiceItem } from '../../models/invoice';
 import { PAYMENT_METHODS, Payment, paymentMethodLabel } from '../../models/payment';
 import { InvoiceDetailViewModel, useInvoiceDetailViewModel } from '../../viewmodels/useInvoiceDetailViewModel';
 import { ChipSelector } from '../components/ChipSelector';
+import { HeaderMenu } from '../components/HeaderMenu';
 import { AddItem, LineEntryRow, SaveBar, TotalRow } from '../components/LineEntry';
 import { ProductPicker } from '../components/ProductPicker';
 import { space, theme, type } from '../theme';
@@ -33,6 +35,29 @@ interface Props {
  */
 export function InvoiceDetailScreen({ invoiceId }: Props) {
   const vm = useInvoiceDetailViewModel(invoiceId);
+  const navigation = useNavigation();
+  const { isCancelled, cancelBill } = vm;
+  // Named apart from the narrowed `invoice` the body uses after its guard.
+  const headerInvoice = vm.invoice;
+
+  // In the header, where it is reachable without scrolling past the whole
+  // bill. Nothing is offered once the bill is already cancelled.
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () =>
+        headerInvoice && !isCancelled ? (
+          <HeaderMenu
+            actions={[
+              {
+                label: 'Cancel / delete this bill',
+                destructive: true,
+                onPress: () => confirmCancel(headerInvoice, cancelBill),
+              },
+            ]}
+          />
+        ) : null,
+    });
+  }, [navigation, headerInvoice, isCancelled, cancelBill]);
 
   if (vm.isLoading) {
     return (
@@ -195,24 +220,6 @@ export function InvoiceDetailScreen({ invoiceId }: Props) {
         </View>
 
         {invoice.notes ? <Text style={styles.notes}>{invoice.notes}</Text> : null}
-
-        {/*
-          Kept at the very bottom, plain and grey rather than red and prominent.
-          Cancelling is rare and irreversible from inside the app, so it should
-          take deliberate scrolling to reach, never sit next to Share.
-        */}
-        {vm.isCancelled ? null : (
-          <Pressable
-            onPress={() => confirmCancel(vm)}
-            disabled={vm.isCancelling}
-            style={styles.cancelBill}
-            accessibilityRole="button"
-          >
-            <Text style={styles.cancelBillLabel}>
-              {vm.isCancelling ? 'Cancelling…' : 'Cancel this bill'}
-            </Text>
-          </Pressable>
-        )}
 
         {vm.cancelError ? (
           <Pressable onPress={vm.dismissCancelError}>
@@ -380,10 +387,7 @@ function RecordPayment({ vm }: { vm: InvoiceDetailViewModel }) {
  * already be holding a printed copy, so the question names the bill and spells
  * out the consequences rather than asking a bare "are you sure?".
  */
-function confirmCancel(vm: InvoiceDetailViewModel): void {
-  const invoice = vm.invoice;
-  if (!invoice) return;
-
+function confirmCancel(invoice: Invoice, cancelBill: () => Promise<boolean>): void {
   Alert.alert(
     `Cancel ${invoice.invoiceNo}?`,
     `The bill keeps its number and stays in the book marked cancelled, the ${invoice.items.length === 1 ? 'item goes' : 'items go'} back into stock, and it stops counting toward dues. This cannot be undone.`,
@@ -392,7 +396,7 @@ function confirmCancel(vm: InvoiceDetailViewModel): void {
       {
         text: 'Cancel the bill',
         style: 'destructive',
-        onPress: () => void vm.cancelBill(),
+        onPress: () => void cancelBill(),
       },
     ],
   );
@@ -571,13 +575,6 @@ const styles = StyleSheet.create({
   cancelledTitle: { ...type.body, fontWeight: '700', color: theme.danger },
   cancelledBody: { ...type.caption, color: theme.danger, lineHeight: 20 },
 
-  cancelBill: {
-    alignSelf: 'center',
-    paddingVertical: space.md,
-    paddingHorizontal: space.lg,
-    marginTop: space.lg,
-  },
-  cancelBillLabel: { ...type.body, color: theme.textMuted },
   addHint: { ...type.caption, color: theme.textMuted, lineHeight: 20 },
   addEmpty: { ...type.body, color: theme.textMuted, textAlign: 'center', paddingVertical: space.lg },
   recordButton: {
