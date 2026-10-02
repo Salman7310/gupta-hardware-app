@@ -1,5 +1,5 @@
 import React, { type ReactNode } from 'react';
-import { renderHook, waitFor } from '@testing-library/react-native';
+import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { Money } from '../../core';
 import { ContainerProvider } from '../../di/provider';
 import { WALK_IN } from '../../services/dues';
@@ -55,7 +55,7 @@ describe('the dues screen', () => {
     expect(result.current.dues.billCount).toBe(1);
 
     await payments.append(aPayment({ invoiceId: 'inv-1', amount: Money.fromRupees(1000) }));
-    result.current.refresh();
+    await act(async () => result.current.refresh());
     await waitFor(() => expect(result.current.dues.billCount).toBe(0));
   });
 

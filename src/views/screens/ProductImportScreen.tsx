@@ -54,16 +54,21 @@ export function ProductImportScreen({ onDone }: { onDone: () => void }) {
             <>
               <Text style={styles.summary}>
                 {preview.valid.length} ready to import
+                {preview.duplicates.length > 0
+                  ? `, ${preview.duplicates.length} already in the catalogue`
+                  : ''}
                 {preview.invalid.length > 0 ? `, ${preview.invalid.length} with problems` : ''}
               </Text>
 
               {preview.duplicates.length > 0 ? (
                 <View style={styles.problems}>
                   <Text style={styles.problemsTitle}>
-                    {preview.duplicates.length} already in the catalogue
+                    {preview.duplicates.length} already in the catalogue — left as they are
                   </Text>
                   <Text style={styles.problemReason}>
-                    Importing adds them again rather than updating. Check these names first:{' '}
+                    Products are matched by name, so these are not added again and their rate is
+                    not changed. Their opening stock is not added either: to add stock, open the
+                    product and use Receive stock.{' '}
                     {preview.duplicates
                       .slice(0, 4)
                       .map((r) => r.name)
@@ -95,7 +100,9 @@ export function ProductImportScreen({ onDone }: { onDone: () => void }) {
                   accessibilityRole="button"
                 >
                   <Text style={styles.buttonLabel}>
-                    {vm.isImporting ? 'Importing…' : `Import ${preview.valid.length} products`}
+                    {vm.isImporting
+                      ? 'Importing…'
+                      : `Import ${preview.valid.length} ${preview.valid.length === 1 ? 'product' : 'products'}`}
                   </Text>
                 </Pressable>
               ) : null}

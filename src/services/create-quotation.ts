@@ -89,6 +89,7 @@ export class CreateQuotation {
       quantity: line.input.quantity,
       rate: line.input.rate,
       taxRateBps: line.input.taxRateBps,
+      hsnCode: line.input.hsnCode ?? null,
       discountBps: line.input.discountBps,
       discount: line.discount.add(line.billDiscountShare),
       lineTotal: line.total,

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useContainer } from '../di/provider';
 import { DeviceIdentity, Shop } from '../models/shop';
 import { BackupSummary } from '../services/backup-service';
-import { ShopDetailsInput } from '../services/identity';
+import { ShopDetailsInput, ShopField, shopFieldErrors } from '../services/identity';
 
 export const draftFromShop = (shop: Shop): ShopDetailsInput => ({
   name: shop.name,
@@ -19,11 +19,20 @@ export interface ShopViewModel {
   readonly billsFolder: string | null;
   readonly isLoading: boolean;
   forgetFolder(): Promise<void>;
+  /**
+   * Reads the folder again. The screen calls this whenever the tab comes into
+   * view, because the folder is usually granted somewhere else entirely — by
+   * Save PDF on a bill — and until then the tab said "Not chosen yet" while
+   * bills were already being filed there.
+   */
+  refreshFolder(): Promise<void>;
 
   readonly isEditing: boolean;
   readonly draft: ShopDetailsInput;
   readonly isSaving: boolean;
   readonly error: string | null;
+  /** Each field's problem, shown beside it rather than one at a time below the form. */
+  readonly fieldErrors: Partial<Record<ShopField, string>>;
   startEditing(): void;
   cancelEditing(): void;
   setField(field: keyof ShopDetailsInput, value: string): void;
@@ -54,6 +63,7 @@ export function useShopViewModel(): ShopViewModel {
   const [draft, setDraft] = useState<ShopDetailsInput>(() => draftFromShop(identity.shop));
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<ShopField, string>>>({});
 
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [backupNotice, setBackupNotice] = useState<string | null>(null);
@@ -108,6 +118,7 @@ export function useShopViewModel(): ShopViewModel {
     // time, so a cancelled edit leaves nothing behind.
     setDraft(draftFromShop(identity.shop));
     setError(null);
+    setFieldErrors({});
     setIsEditing(true);
   }, [identity.shop]);
 
@@ -119,9 +130,14 @@ export function useShopViewModel(): ShopViewModel {
   const setField = useCallback((field: keyof ShopDetailsInput, value: string) => {
     setDraft((current) => ({ ...current, [field]: value }));
     setError(null);
+    setFieldErrors((e) => (e[field] ? { ...e, [field]: undefined } : e));
   }, []);
 
   const save = useCallback(async (): Promise<boolean> => {
+    const problems = shopFieldErrors(draft);
+    setFieldErrors(problems);
+    if (Object.keys(problems).length > 0) return false;
+
     setIsSaving(true);
     try {
       const saved = await identityService.updateShop(draft);
@@ -200,12 +216,14 @@ export function useShopViewModel(): ShopViewModel {
       shop: identity.shop,
       device: identity.device,
       billsFolder,
+      refreshFolder,
       isLoading,
       forgetFolder,
       isEditing,
       draft,
       isSaving,
       error,
+      fieldErrors,
       startEditing,
       cancelEditing,
       setField,
@@ -234,12 +252,14 @@ export function useShopViewModel(): ShopViewModel {
       dismissBackupNotice,
       identity,
       billsFolder,
+      refreshFolder,
       isLoading,
       forgetFolder,
       isEditing,
       draft,
       isSaving,
       error,
+      fieldErrors,
       startEditing,
       cancelEditing,
       setField,

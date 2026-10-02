@@ -12,6 +12,7 @@ import {
   readableBillDiscount,
   validateBill,
 } from '../services/bill';
+import { useLineCommands } from './useLineCommands';
 import { useLineEntry } from './useLineEntry';
 
 const NO_ERRORS: BillErrors = { lines: {} };
@@ -40,6 +41,12 @@ export interface BillViewModel {
   readonly customer: Customer | null;
   /** The quotation this bill was started from, for the note on the screen. */
   readonly startedFrom: Quotation | null;
+  /**
+   * The bill charges GST but the shop has no GSTIN on file. Only a registered
+   * shop may charge GST, so the screen says so rather than letting the bill
+   * go out as if it were a tax invoice.
+   */
+  readonly chargesGstWithoutGstin: boolean;
   setCustomer(customer: Customer | null): void;
   addProduct(product: Product): void;
   removeLine(key: string): void;
@@ -64,10 +71,13 @@ export interface BillViewModel {
  * The arithmetic lives in the calculator and the writing in CreateInvoice;
  * nothing here touches a repository directly.
  */
+/** Measured against the whole bill, so any change to the lines makes it stale. */
+const BILL_WIDE: readonly (keyof BillErrors)[] = ['paid'];
+
 export function useBillViewModel(start?: BillStart): BillViewModel {
-  const { createInvoice, paymentBook, billArchive, quotations } = useContainer();
-  const [billDiscount, setBillDiscount] = useState(start?.draft.billDiscount ?? '');
-  const [paid, setPaid] = useState(start?.draft.paid ?? '');
+  const { createInvoice, paymentBook, billArchive, quotations, identity } = useContainer();
+  const [billDiscount, setBillDiscountValue] = useState(start?.draft.billDiscount ?? '');
+  const [paid, setPaidValue] = useState(start?.draft.paid ?? '');
   const [notes, setNotes] = useState(start?.draft.notes ?? '');
   const [errors, setErrors] = useState<BillErrors>(NO_ERRORS);
   const [isSaving, setIsSaving] = useState(false);
@@ -77,6 +87,22 @@ export function useBillViewModel(start?: BillStart): BillViewModel {
   const discount = useMemo(() => readableBillDiscount(billDiscount), [billDiscount]);
   const entry = useLineEntry(discount, start?.draft.lines ?? []);
   const { replaceAll } = entry;
+  const commands = useLineCommands(entry, setErrors, BILL_WIDE);
+
+  // Each clears its own error as it is edited. The discount moves the total,
+  // so it clears an overpayment too.
+  const setBillDiscount = useCallback((value: string) => {
+    setBillDiscountValue(value);
+    setErrors((e) =>
+      e.billDiscount || e.paid || e.form
+        ? { ...e, billDiscount: undefined, paid: undefined, form: undefined }
+        : e,
+    );
+  }, []);
+  const setPaid = useCallback((value: string) => {
+    setPaidValue(value);
+    setErrors((e) => (e.paid ? { ...e, paid: undefined } : e));
+  }, []);
 
   const draft = useMemo<BillDraft>(
     () => ({ lines: entry.lines, billDiscount, paid, notes }),
@@ -134,8 +160,8 @@ export function useBillViewModel(start?: BillStart): BillViewModel {
       }
 
       replaceAll([]);
-      setBillDiscount('');
-      setPaid('');
+      setBillDiscountValue('');
+      setPaidValue('');
       setNotes('');
       setErrors(NO_ERRORS);
       setCustomer(null);
@@ -156,19 +182,26 @@ export function useBillViewModel(start?: BillStart): BillViewModel {
       isEmpty: entry.isEmpty,
       customer,
       startedFrom,
+      chargesGstWithoutGstin: !identity.shop.gstin && !entry.totals.taxTotal.isZero(),
       setCustomer,
-      addProduct: entry.addProduct,
-      removeLine: entry.removeLine,
-      setLineField: entry.setLineField,
-      addDimension: entry.addDimension,
-      removeDimension: entry.removeDimension,
-      setDimensionField: entry.setDimensionField,
-      setMeasuring: entry.setMeasuring,
+      ...commands,
       setBillDiscount,
       setPaid,
       setNotes,
       save,
     }),
-    [draft, entry, errors, isSaving, customer, startedFrom, save],
+    [
+      draft,
+      entry,
+      commands,
+      errors,
+      isSaving,
+      customer,
+      startedFrom,
+      identity,
+      setBillDiscount,
+      setPaid,
+      save,
+    ],
   );
 }

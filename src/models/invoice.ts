@@ -12,6 +12,12 @@ export interface LineItemInput {
   readonly rate: Money;
   readonly taxRateBps: number;
   readonly discountBps: number;
+  /**
+   * The product's HSN code when it was sold, copied like the name and rate so
+   * a later edit to the product cannot change what an issued bill says.
+   * Optional here because a line can be priced before any product is known.
+   */
+  readonly hsnCode?: string | null;
 }
 
 export interface CalculatedLine {
@@ -64,6 +70,8 @@ export interface InvoiceItem {
    */
   readonly discount: Money;
   readonly lineTotal: Money;
+  /** Printed on the tax invoice beside the rate. Null where none was recorded. */
+  readonly hsnCode: string | null;
 }
 
 export type PaymentState = 'paid' | 'partial' | 'unpaid';
@@ -125,6 +133,7 @@ export function toLineInput(item: InvoiceItem): LineItemInput {
     rate: item.rate,
     taxRateBps: item.taxRateBps,
     discountBps: item.discountBps,
+    hsnCode: item.hsnCode,
   };
 }
 

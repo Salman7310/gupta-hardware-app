@@ -34,9 +34,13 @@ export function parseUnitAmount(raw: string, unit: UnitDefinition): number | nul
   const [whole, fraction = ''] = cleaned.replace('-', '').split('.');
   const places = fraction.length;
   const scaled = Number(whole + fraction) * unit.scale;
-  const amount = places === 0 ? scaled : divideRoundHalfUp(scaled, 10 ** places);
 
-  if (unit.entry === 'whole' && places > 0 && amount % 1 !== 0) return null;
+  // A box, bag or piece is sold whole. This has to be decided on the exact
+  // figure, before rounding: rounded first, "2.5" boxes became 3 and "2.4"
+  // became 2, and either way a bill charged for a quantity nobody typed.
+  if (unit.entry === 'whole' && places > 0 && scaled % 10 ** places !== 0) return null;
+
+  const amount = places === 0 ? scaled : divideRoundHalfUp(scaled, 10 ** places);
   return negative ? -amount : amount;
 }
 

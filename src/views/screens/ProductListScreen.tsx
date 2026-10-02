@@ -83,6 +83,15 @@ export function ProductListScreen({ onAdd, onEdit, onImport }: Props) {
           )}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.listContent}
+          // Once there is a catalogue the empty state's import button is gone,
+          // and the only other way in was the foot of the Shop tab.
+          ListFooterComponent={
+            vm.query.trim().length === 0 ? (
+              <Pressable onPress={onImport} style={styles.importMore} accessibilityRole="button">
+                <Text style={styles.importMoreLabel}>Import more from a spreadsheet</Text>
+              </Pressable>
+            ) : null
+          }
         />
       )}
 
@@ -100,6 +109,8 @@ export function ProductListScreen({ onAdd, onEdit, onImport }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.background },
+  importMore: { alignSelf: 'center', paddingVertical: space.lg, paddingHorizontal: space.lg },
+  importMoreLabel: { ...type.body, color: theme.accentInk },
   search: {
     margin: space.lg,
     marginBottom: space.sm,

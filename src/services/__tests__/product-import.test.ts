@@ -87,8 +87,16 @@ describe('duplicate detection', () => {
     const preview = previewProductImport(csv, ['makrana marble white']);
     expect(preview.duplicates).toHaveLength(1);
     expect(preview.duplicates[0].name).toBe('Makrana Marble White');
-    // Still importable — the decision is the shopkeeper's, not ours.
-    expect(preview.valid).toHaveLength(2);
+    // Not counted as ready: the import skips a name the catalogue already has,
+    // and a preview that counted it promised one more product than arrived.
+    expect(preview.valid).toHaveLength(1);
+  });
+
+  it('treats a name repeated within the same file as a duplicate', () => {
+    const twice = 'name,unit,rate\nBirla Putty,bag,1450\nbirla  putty,bag,1450\n';
+    const preview = previewProductImport(twice);
+    expect(preview.valid).toHaveLength(1);
+    expect(preview.duplicates.map((r) => r.line)).toEqual([3]);
   });
 
   it('ignores case and surrounding space when matching', () => {
@@ -97,5 +105,27 @@ describe('duplicate detection', () => {
 
   it('reports none when the catalogue is empty', () => {
     expect(previewProductImport(csv).duplicates).toHaveLength(0);
+  });
+});
+
+/**
+ * Opening stock that will not read used to vanish: the product arrived with
+ * nothing on the shelf and no word about why.
+ */
+describe('opening stock that will not do', () => {
+  it('refuses a part box, naming the column', () => {
+    const preview = previewProductImport('name,unit,rate,opening stock\nTile,box,450,2.5\n');
+    expect(preview.valid).toHaveLength(0);
+    expect(describeRowErrors(preview.invalid[0])).toBe('Opening stock must be a whole number of box');
+  });
+
+  it('refuses stock below zero', () => {
+    const preview = previewProductImport('name,unit,rate,opening stock\nTile,box,450,-5\n');
+    expect(describeRowErrors(preview.invalid[0])).toBe('Opening stock cannot be below zero');
+  });
+
+  it('still takes decimals for square feet', () => {
+    const preview = previewProductImport('name,unit,rate,opening stock\nMarble,sqft,120,42.5\n');
+    expect(preview.valid[0].openingStock).toBe(42.5 * 144);
   });
 });

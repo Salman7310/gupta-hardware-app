@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { ShopSetupInput } from '../../services/identity';
+import { ShopField, ShopSetupInput, shopFieldErrors } from '../../services/identity';
 
 interface Props {
   readonly onSubmit: (input: ShopSetupInput) => void;
@@ -28,7 +28,23 @@ export function SetupScreen({ onSubmit, isSubmitting, error }: Props) {
   const [invoicePrefix, setInvoicePrefix] = useState('GH');
   const [deviceLetter, setDeviceLetter] = useState('A');
 
-  const submit = () => onSubmit({ name, address, phone, gstin, invoicePrefix, deviceLetter });
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<ShopField, string>>>({});
+
+  // Every problem shown beside its own field at once, rather than one at a
+  // time at the foot of a form taller than the screen.
+  const submit = () => {
+    const input = { name, address, phone, gstin, invoicePrefix, deviceLetter };
+    const errors = shopFieldErrors(input);
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+    onSubmit(input);
+  };
+
+  /** A setter that also clears that field's error as it is corrected. */
+  const edit = (field: ShopField, set: (v: string) => void) => (value: string) => {
+    set(value);
+    setFieldErrors((e) => (e[field] ? { ...e, [field]: undefined } : e));
+  };
 
   return (
     <KeyboardAvoidingView
@@ -38,10 +54,16 @@ export function SetupScreen({ onSubmit, isSubmitting, error }: Props) {
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Set up your shop</Text>
         <Text style={styles.subtitle}>
-          These details print on every bill. You can change them later in settings.
+          These details print on every bill. You can change them later in the Shop tab.
         </Text>
 
-        <Field label="Shop name" value={name} onChange={setName} placeholder="Gupta Hardware" />
+        <Field
+          label="Shop name"
+          value={name}
+          onChange={edit('name', setName)}
+          placeholder="Gupta Hardware"
+          error={fieldErrors.name}
+        />
         <Field
           label="Address"
           value={address}
@@ -52,21 +74,25 @@ export function SetupScreen({ onSubmit, isSubmitting, error }: Props) {
         <Field
           label="Mobile"
           value={phone}
-          onChange={setPhone}
+          onChange={edit('phone', setPhone)}
           placeholder="98765 43210"
           keyboard="phone-pad"
+          error={fieldErrors.phone}
         />
         <Field
           label="GSTIN"
           value={gstin}
-          onChange={setGstin}
+          onChange={edit('gstin', setGstin)}
           placeholder="Optional"
           autoCapitalize="characters"
+          hint="Your GST number. Bills print as tax invoices only when this is filled in."
+          error={fieldErrors.gstin}
         />
         <Field
           label="Bill prefix"
           value={invoicePrefix}
-          onChange={setInvoicePrefix}
+          onChange={edit('invoicePrefix', setInvoicePrefix)}
+          error={fieldErrors.invoicePrefix}
           placeholder="GH"
           autoCapitalize="characters"
           hint="Appears at the start of every bill number, for example GH/A/0001"
@@ -74,7 +100,8 @@ export function SetupScreen({ onSubmit, isSubmitting, error }: Props) {
         <Field
           label="Counter letter"
           value={deviceLetter}
-          onChange={setDeviceLetter}
+          onChange={edit('deviceLetter', setDeviceLetter)}
+          error={fieldErrors.deviceLetter}
           placeholder="A"
           autoCapitalize="characters"
           hint="Give each phone or tablet its own letter so two counters never issue the same bill number"
@@ -104,6 +131,7 @@ function Field({
   multiline,
   autoCapitalize,
   keyboard,
+  error,
 }: {
   label: string;
   value: string;
@@ -113,6 +141,7 @@ function Field({
   multiline?: boolean;
   autoCapitalize?: 'none' | 'characters' | 'words' | 'sentences';
   keyboard?: 'default' | 'phone-pad';
+  error?: string;
 }) {
   return (
     <View style={styles.field}>
@@ -128,6 +157,7 @@ function Field({
         keyboardType={keyboard}
         autoCorrect={false}
       />
+      {error ? <Text style={styles.fieldError}>{error}</Text> : null}
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
     </View>
   );
@@ -139,6 +169,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, color: '#1a1a18', marginBottom: 4 },
   subtitle: { fontSize: 15, color: '#6b6b66', lineHeight: 22, marginBottom: 20 },
   field: { marginBottom: 18 },
+  fieldError: { fontSize: 13, color: '#A32D2D', marginTop: 6 },
   label: { fontSize: 14, color: '#44443f', marginBottom: 6 },
   input: {
     paddingHorizontal: 14,

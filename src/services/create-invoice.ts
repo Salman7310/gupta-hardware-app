@@ -73,6 +73,17 @@ export class CreateInvoice {
       );
     }
 
+    // Checked here as well as on the form, because this is what writes the
+    // receipt: an overpayment saved once is a cash figure that is simply wrong.
+    if (input.paid.compare(totals.grandTotal) > 0) {
+      return err(
+        appError(
+          'invoice.overpaid',
+          `That is more than the ${totals.grandTotal.format()} bill. Enter only what goes towards it.`,
+        ),
+      );
+    }
+
     // Allocating the number before the write means a failed write burns it and
     // leaves a gap in the series. That is the lesser evil: holding the number
     // until after the write would let two fast taps take the same one, and a
@@ -90,6 +101,7 @@ export class CreateInvoice {
       quantity: line.input.quantity,
       rate: line.input.rate,
       taxRateBps: line.input.taxRateBps,
+      hsnCode: line.input.hsnCode ?? null,
       discountBps: line.input.discountBps,
       discount: line.discount.add(line.billDiscountShare),
       lineTotal: line.total,

@@ -22,6 +22,8 @@ export interface ProductFormViewModel {
   readonly isSaving: boolean;
   readonly isEditing: boolean;
   readonly loadError: string | null;
+  /** Something has been changed since the form opened, so leaving would lose it. */
+  readonly isDirty: boolean;
   setField(field: ProductField, value: string): void;
   setCategory(category: ProductCategory): void;
   setUnit(unit: UnitCode): void;
@@ -37,6 +39,7 @@ export function useProductFormViewModel(productId: string | null): ProductFormVi
   const [draft, setDraft] = useState<ProductDraft>(emptyProductDraft);
   const [errors, setErrors] = useState<ProductErrors>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
 
   useEffect(() => {
     if (!productId) return;
@@ -70,16 +73,23 @@ export function useProductFormViewModel(productId: string | null): ProductFormVi
 
   /** Clearing the error as the field is edited, rather than on next submit. */
   const setField = useCallback((field: ProductField, value: string) => {
+    setIsDirty(true);
     setDraft((current) => ({ ...current, [field]: value }));
     setErrors((current) => (current[field] ? { ...current, [field]: undefined } : current));
   }, []);
 
   const setCategory = useCallback(
-    (category: ProductCategory) => setDraft((c) => ({ ...c, category })),
+    (category: ProductCategory) => {
+      setIsDirty(true);
+      setDraft((c) => ({ ...c, category }));
+    },
     [],
   );
 
-  const setUnit = useCallback((unitCode: UnitCode) => setDraft((c) => ({ ...c, unitCode })), []);
+  const setUnit = useCallback((unitCode: UnitCode) => {
+    setIsDirty(true);
+    setDraft((c) => ({ ...c, unitCode }));
+  }, []);
 
   const existing = state.status === 'ready' ? state.existing : null;
 
@@ -89,6 +99,7 @@ export function useProductFormViewModel(productId: string | null): ProductFormVi
       const result = await catalogue.save(draft, existing);
       if (result.ok) {
         setErrors({});
+        setIsDirty(false);
         return result.value;
       }
       setErrors(result.error);
@@ -109,11 +120,12 @@ export function useProductFormViewModel(productId: string | null): ProductFormVi
       isSaving,
       isEditing: existing !== null,
       loadError: state.status === 'error' ? state.message : null,
+      isDirty,
       setField,
       setCategory,
       setUnit,
       save,
     }),
-    [draft, errors, state, isSaving, existing, setField, setCategory, setUnit, save],
+    [draft, errors, state, isSaving, existing, isDirty, setField, setCategory, setUnit, save],
   );
 }

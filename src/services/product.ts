@@ -108,7 +108,8 @@ export function validateProductDraft(draft: ProductDraft): Result<ValidatedProdu
   if (name.length === 0) errors.name = 'Enter a product name';
 
   const salePrice = parseMoney(draft.salePrice);
-  if (salePrice === null) errors.salePrice = `Enter a rate per ${unit.label}`;
+  if (draft.salePrice.trim().length === 0) errors.salePrice = `Enter a rate per ${unit.label}`;
+  else if (salePrice === null) errors.salePrice = 'The rate must be a number, for example 450.';
   else if (salePrice.isNegative()) errors.salePrice = 'Rate cannot be negative';
 
   let purchasePrice = Money.zero;

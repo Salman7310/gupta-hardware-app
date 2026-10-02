@@ -16,7 +16,8 @@ describe('Money', () => {
   it('formats with Indian digit grouping', () => {
     expect(Money.fromPaise(125050).format()).toBe('₹1,250.50');
     expect(Money.fromPaise(12345678).format()).toBe('₹1,23,456.78');
-    expect(Money.fromPaise(-50).format()).toBe('₹-0.50');
+    // The sign goes before the symbol, as on the printed bill: never ₹-0.50.
+    expect(Money.fromPaise(-50).format()).toBe('-₹0.50');
   });
 
   it('computes a percentage in basis points', () => {

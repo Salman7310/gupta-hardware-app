@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Customer } from '../../models/customer';
-import { CustomerField } from '../../services/customer';
 import { useCustomerPickerViewModel } from '../../viewmodels/useCustomerPickerViewModel';
 import { card, radius, size, space, theme, type } from '../theme';
 

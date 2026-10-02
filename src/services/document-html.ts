@@ -1,4 +1,4 @@
-import { Money, Quantity } from '../core';
+import { Money, Quantity, divideRoundHalfUp, formatPercentFromBps } from '../core';
 import { Customer } from '../models/customer';
 import { Shop } from '../models/shop';
 
@@ -23,10 +23,7 @@ export const escape = (value: string): string =>
 /** Escaped, with newlines kept as line breaks. For an address. */
 export const lines = (value: string): string => escape(value).replace(/\n/g, '<br />');
 
-export const money = (amount: Money): string =>
-  amount.isNegative()
-    ? `-₹${amount.negate().toPlainString()}`
-    : `₹${amount.toPlainString()}`;
+export const money = (amount: Money): string => amount.format();
 
 /**
  * A document number contains slashes, which no file system will take, so it
@@ -45,6 +42,75 @@ export interface DocumentLine {
   readonly rate: Money;
   readonly discount: Money;
   readonly lineTotal: Money;
+  /** Absent on lines saved before HSN codes were carried onto documents. */
+  readonly hsnCode?: string | null;
+  readonly taxRateBps?: number;
+}
+
+/** "18", "0.25", and "0" — the discount formatter leaves zero blank on purpose. */
+const ratePercent = (bps: number): string => (bps === 0 ? '0' : formatPercentFromBps(bps));
+
+/**
+ * "HSN 6907 · GST 18%", or whichever half is known.
+ *
+ * A tax invoice is expected to show the HSN code and the rate of tax for each
+ * item. Printed under the item rather than as two more columns, because the
+ * table is laid out for an A4 sheet and a narrow phone screen both, and two
+ * more columns would squeeze the item names into three lines each.
+ */
+export function taxLabel(item: DocumentLine): string {
+  const parts: string[] = [];
+  if (item.hsnCode) parts.push(`HSN ${item.hsnCode}`);
+  if (item.taxRateBps !== undefined) parts.push(`GST ${ratePercent(item.taxRateBps)}%`);
+  return parts.join(' · ');
+}
+
+/** What the line was taxed on: gross, less its own discount and its share of a lump sum. */
+const taxableOf = (item: DocumentLine): Money => grossOf(item).subtract(item.discount);
+
+/**
+ * The tax split by rate, for a bill that mixes rates.
+ *
+ * With tiles at 18% and cement at 28% on one bill, a single CGST and SGST
+ * figure cannot be checked against either rate. This lists each rate with the
+ * value taxed at it, which is how an accountant reconciles the bill. Each
+ * line's own tax is split as it was when the bill was made, so the rows add
+ * back to the CGST and SGST printed above, to the paisa.
+ */
+export function gstSummary(items: readonly DocumentLine[]): string {
+  const byRate = new Map<number, { taxable: Money; cgst: Money; sgst: Money }>();
+  for (const item of items) {
+    if (item.taxRateBps === undefined) return '';
+    const taxable = taxableOf(item);
+    const tax = item.lineTotal.subtract(taxable);
+    const cgst = Money.fromPaise(divideRoundHalfUp(tax.paise, 2));
+    const row = byRate.get(item.taxRateBps) ?? { taxable: Money.zero, cgst: Money.zero, sgst: Money.zero };
+    byRate.set(item.taxRateBps, {
+      taxable: row.taxable.add(taxable),
+      cgst: row.cgst.add(cgst),
+      sgst: row.sgst.add(tax.subtract(cgst)),
+    });
+  }
+  if (byRate.size < 2) return '';
+
+  const rows = [...byRate.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(
+      ([bps, r]) => `<tr>
+        <td>GST ${ratePercent(bps)}%</td>
+        <td class="num">${money(r.taxable)}</td>
+        <td class="num">${money(r.cgst)}</td>
+        <td class="num">${money(r.sgst)}</td>
+      </tr>`,
+    )
+    .join('');
+
+  return `<h2>GST by rate</h2>
+    <table class="items gst">
+      <colgroup><col class="g-rate" /><col class="g-num" /><col class="g-num" /><col class="g-num" /></colgroup>
+      <thead><tr><th>Rate</th><th class="num">Taxable value</th><th class="num">CGST</th><th class="num">SGST</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
 }
 
 /**
@@ -62,7 +128,9 @@ export function grossOf(item: DocumentLine): Money {
 
 export function itemRow(item: DocumentLine): string {
   const working = item.quantity.describeWorking();
+  const tax = taxLabel(item);
   const detail = [
+    tax ? `<div class="sub">${escape(tax)}</div>` : '',
     working ? `<div class="sub">${escape(working)}</div>` : '',
     item.discount.isZero() ? '' : `<div class="sub">Less ${money(item.discount)}</div>`,
   ].join('');
@@ -209,6 +277,10 @@ export const DOCUMENT_CSS = `
       .c-qty { width: 14%; }
       .c-rate { width: 20%; }
       .c-amount { width: 24%; }
+      .g-rate { width: 31%; }
+      .g-num { width: 23%; }
+      /* A heading over a column of figures sits over the figures. */
+      .items th.num { text-align: right; }
       .items th {
         text-align: left;
         font-size: 10px;

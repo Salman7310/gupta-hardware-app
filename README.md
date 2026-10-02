@@ -8,8 +8,10 @@ marble, granite, wall putty and paint. The shop writes every bill by hand today.
 - Build a bill from many line items, with discount, GST and the total calculated
   as the shopkeeper types
 - Handles each product in the unit it is actually sold in — marble and granite
-  by square feet from length by width, tiles by the box, putty by the bag, paint
-  by the litre
+  by square feet (typed as a total, or measured piece by piece), tiles by the
+  box, putty by the bag, paint by the litre
+- Prints the HSN code and GST rate on every line, and the tax by rate on a bill
+  that mixes rates
 - Produces a GST invoice as a PDF and shares it to the customer over WhatsApp
 - Prices up a job as a quotation before anything is sold, shares it as a PDF,
   and reopens it as a bill when the customer accepts
@@ -39,13 +41,17 @@ See [`docs/sprints.md`](docs/sprints.md).
 | Product list with live stock        | done                                           |
 | Product create and edit             | done, form driven by the unit                  |
 | Stock ledger                        | done, totals derived by summing movements      |
+| Receiving stock and counting it     | done, on the product: deliveries in, counts put right |
 | CSV catalogue import                | done, with preview and per-row errors          |
 | Creating an invoice                 | done, one transaction, tested against SQLite   |
-| Billing screen                      | done, walk-in only until the customer picker   |
+| Billing screen                      | done, walk-in or a named customer              |
 | Stone measured length by width      | done, feet and inches, working kept on the bill|
 | Bills list and bill detail          | done, newest first, paid / part paid / unpaid  |
 | Icon, launch screen, design system  | done                                           |
-| Customer picker                     | not started — every bill is a walk-in          |
+| Customer picker                     | done, name and mobile printed on the bill      |
+| Adding items to an issued bill      | done, same number, whole bill recalculated     |
+| Cancelling a bill, deleting a quote | done, a bill keeps its number and is marked cancelled |
+| HSN and GST rate on the invoice     | done, copied from the product when sold        |
 | Golden tests from the shop's bills  | not started — waiting on the bills             |
 | Barcode lookup                      | not done — deferred, see below                 |
 | PDF bill, share and saved copy       | done, saved outside the app so it survives an uninstall |
@@ -59,10 +65,12 @@ See [`docs/sprints.md`](docs/sprints.md).
 
 Known problems, none of them cosmetic:
 
-- Importing the same catalogue twice creates a second copy of every product
-  rather than matching on name, and stock then splits across the copies.
+- CGST and SGST are each worked out at half the rate and rounded on their own,
+  so they always print equal. The shop's accountant has not yet confirmed this
+  is how they want it; the golden tests from real bills will settle it.
 - Stock is allowed to go negative, deliberately, so a wrong stock figure can
-  never block a sale at the counter. Nothing yet draws attention to it.
+  never block a sale at the counter. The product list flags it "Below zero",
+  and the product's own screen offers "Correct the count".
 - Two devices do not sync. Each keeps its own bills, stock and dues; only the
   bill-number series is designed to avoid collisions between counters.
 - Backups are manual. A shopkeeper who never taps the button has none, though

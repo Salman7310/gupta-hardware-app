@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Money } from '../core';
 import { useContainer } from '../di/provider';
-import { BillTotals, CalculatedLine } from '../models/invoice';
+import { BillTotals, CalculatedLine, LineItemInput } from '../models/invoice';
 import { Product } from '../models/product';
 import {
   BillLineDraft,
@@ -16,7 +16,11 @@ import { calculateBill } from '../services/bill-calculator';
 
 export interface LineEntry {
   readonly lines: readonly BillLineDraft[];
-  /** Recalculated as the shopkeeper types, from the lines that currently read. */
+  /**
+   * Recalculated as the shopkeeper types, from the lines that currently read
+   * together with any fixed lines — so when adding to a bill, these are the
+   * whole bill's new totals, not the new lines' on their own.
+   */
   readonly totals: BillTotals;
   /** The calculated line for each draft line that reads, by key. */
   readonly lineTotals: Readonly<Record<string, CalculatedLine>>;
@@ -47,9 +51,19 @@ export interface LineEntry {
  * on one screen silently missing the other, and the two documents disagreeing
  * about a price is the one failure this app cannot afford.
  */
+const NO_LINES: readonly LineItemInput[] = [];
+
+/**
+ * `fixed` is for adding to a document that already exists: its lines take part
+ * in the arithmetic but are not typed here. A lump sum off the bottom of a bill
+ * is spread over every line by taxable value, so a new line's total — and what
+ * the bill rises by — can only be worked out with the old lines beside it.
+ * Pricing the new lines on their own would hand them the whole discount.
+ */
 export function useLineEntry(
   billDiscount: Money,
   initial: readonly BillLineDraft[] = [],
+  fixed: readonly LineItemInput[] = NO_LINES,
 ): LineEntry {
   const { ids } = useContainer();
   const [lines, setLines] = useState<readonly BillLineDraft[]>(initial);
@@ -64,15 +78,16 @@ export function useLineEntry(
   const totals = useMemo(
     () =>
       calculateBill(
-        readable.flatMap((r) => (r.item ? [r.item] : [])),
+        [...fixed, ...readable.flatMap((r) => (r.item ? [r.item] : []))],
         billDiscount,
       ),
-    [readable, billDiscount],
+    [fixed, readable, billDiscount],
   );
 
   const lineTotals = useMemo(() => {
     const byKey: Record<string, CalculatedLine> = {};
-    let index = 0;
+    // The calculator saw the fixed lines first; the typed ones follow them.
+    let index = fixed.length;
     for (const entry of readable) {
       if (entry.item) {
         byKey[entry.key] = totals.lines[index];
@@ -80,7 +95,7 @@ export function useLineEntry(
       }
     }
     return byKey;
-  }, [readable, totals]);
+  }, [fixed, readable, totals]);
 
   const addProduct = useCallback(
     (product: Product) => {

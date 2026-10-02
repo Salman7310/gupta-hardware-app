@@ -195,6 +195,7 @@ describe('deleting an estimate, against real SQLite', () => {
           discountBps: 0,
           discount: Money.zero,
           lineTotal: Money.fromRupees(1062),
+          hsnCode: '6907',
         },
       ],
     });

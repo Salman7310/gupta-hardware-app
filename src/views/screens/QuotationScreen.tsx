@@ -12,6 +12,7 @@ import {
   entryStyles as styles,
 } from '../components/LineEntry';
 import { ProductPicker } from '../components/ProductPicker';
+import { useConfirmLeave } from '../confirmLeave';
 import { useQuotationViewModel } from '../../viewmodels/useQuotationViewModel';
 
 interface Props {
@@ -31,9 +32,22 @@ export function QuotationScreen({ onSaved }: Props) {
   const [isPicking, setIsPicking] = useState(false);
   const [isPickingCustomer, setIsPickingCustomer] = useState(false);
 
+  const hasWork =
+    !vm.isEmpty ||
+    vm.customer !== null ||
+    vm.draft.billDiscount.trim() !== '' ||
+    vm.draft.notes.trim() !== '';
+  const allowLeave = useConfirmLeave(
+    hasWork,
+    'Discard this quotation?',
+    'It has not been saved. The items you priced will be lost.',
+  );
+
   const submit = async () => {
     const saved = await vm.save();
-    if (saved) onSaved(saved);
+    if (!saved) return;
+    allowLeave();
+    onSaved(saved);
   };
 
   return (

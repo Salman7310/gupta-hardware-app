@@ -341,7 +341,24 @@ export class InMemoryDocumentFiler implements DocumentFiler {
   async keep(fileUri: string, fileName: string): Promise<string | null> {
     if (!this.folder) return null;
     this.kept.push({ uri: fileUri, fileName });
+    // One copy per name, as in the real folder: filing again replaces it.
+    this.filed.set(fileName, fileUri);
     return `${this.folder}/${fileName}`;
+  }
+
+  /** What the folder holds under each file name now, as the rendered uri. */
+  public filed = new Map<string, string>();
+
+  async isKept(fileName: string): Promise<boolean> {
+    return this.filed.has(fileName);
+  }
+
+  /** The html of the copy currently filed under a name, or null if none is. */
+  filedHtml(fileName: string): string | null {
+    const uri = this.filed.get(fileName);
+    if (!uri) return null;
+    const index = Number(/document-(\d+)\.pdf$/.exec(uri)?.[1]) - 1;
+    return this.rendered[index] ?? null;
   }
 
   async chosenFolder(): Promise<string | null> {

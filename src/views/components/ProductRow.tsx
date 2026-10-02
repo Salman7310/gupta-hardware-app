@@ -8,6 +8,9 @@ import { card, radius, size, space, theme, type } from '../theme';
 export function ProductRow({ item, onPress }: { item: ProductListItem; onPress: () => void }) {
   const { product, stock, isLow } = item;
   const unit = unitFor(product.unitCode);
+  // Below zero means more was billed than was ever recorded coming in. It is
+  // flagged on every product, not only those with a low-stock alert set.
+  const isBelowZero = stock.amount < 0;
 
   return (
     <Pressable
@@ -21,9 +24,15 @@ export function ProductRow({ item, onPress }: { item: ProductListItem; onPress: 
         </Text>
         <View style={styles.meta}>
           <Text style={styles.category}>{CATEGORY_LABELS[product.category]}</Text>
-          <View style={[styles.stockPill, isLow && styles.stockPillLow]}>
-            <Text style={[styles.stock, isLow && styles.stockLow]}>
-              {isLow ? 'Low · ' : ''}
+          <View
+            style={[
+              styles.stockPill,
+              isLow && styles.stockPillLow,
+              isBelowZero && styles.stockPillNegative,
+            ]}
+          >
+            <Text style={[styles.stock, isLow && styles.stockLow, isBelowZero && styles.stockNegative]}>
+              {isBelowZero ? 'Below zero · ' : isLow ? 'Low · ' : ''}
               {stock.toDisplay()}
             </Text>
           </View>
@@ -65,6 +74,8 @@ const styles = StyleSheet.create({
   stockPillLow: { backgroundColor: theme.warningBg },
   stock: { ...type.micro, color: theme.textMuted },
   stockLow: { color: theme.warningText },
+  stockPillNegative: { backgroundColor: theme.dangerSurface },
+  stockNegative: { color: theme.danger },
 
   priceBlock: { alignItems: 'flex-end' },
   rate: { ...type.bodyStrong, color: theme.text },

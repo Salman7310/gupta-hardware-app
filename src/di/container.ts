@@ -12,6 +12,7 @@ import { Identity } from '../services/identity';
 import { PaymentBook } from '../services/payment';
 import { InvoiceNumberService } from '../services/invoice-number';
 import { ProductCatalogue } from '../services/product-catalogue';
+import { StockBook } from '../services/stock-book';
 import {
   BackupRepository,
   CustomerRepository,
@@ -62,6 +63,7 @@ export interface AppContainer extends PlatformServices {
   readonly cancelInvoice: CancelInvoice;
   readonly createQuotation: CreateQuotation;
   readonly catalogue: ProductCatalogue;
+  readonly stockBook: StockBook;
   readonly customers: CustomerBook;
   readonly paymentBook: PaymentBook;
   readonly billArchive: BillArchive;
@@ -128,6 +130,7 @@ export function createContainer(
       platform.clock,
       shopId,
     ),
+    stockBook: new StockBook(stockRepository, platform.ids, platform.clock, shopId),
     customers: new CustomerBook(customerRepository, platform.ids, platform.clock, shopId),
     paymentBook: new PaymentBook(paymentRepository, platform.ids, platform.clock, shopId),
     billArchive: new BillArchive(filer, identity.shop),

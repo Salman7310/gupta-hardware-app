@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -12,9 +12,16 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatDate } from '../../core';
+import { useFocusEffect } from 'expo-router';
 import { ShopDetailsInput } from '../../services/identity';
-import { ShopViewModel, useShopViewModel } from '../../viewmodels/useShopViewModel';
+import {
+  ShopViewModel,
+  draftFromShop,
+  useShopViewModel,
+} from '../../viewmodels/useShopViewModel';
+import { confirmDiscard } from '../confirmLeave';
 import { BrandMark } from '../components/BrandMark';
+import { folderLabel } from '../format';
 import { card, radius, size, space, theme, type } from '../theme';
 
 interface Props {
@@ -27,6 +34,14 @@ interface Props {
  */
 export function ShopScreen({ onImport }: Props) {
   const vm = useShopViewModel();
+  const { refreshFolder } = vm;
+
+  // Depends on the stable command, never the ViewModel — see ProductListScreen.
+  useFocusEffect(
+    useCallback(() => {
+      void refreshFolder();
+    }, [refreshFolder]),
+  );
   const { shop, device } = vm;
 
   return (
@@ -115,7 +130,7 @@ export function ShopScreen({ onImport }: Props) {
           <>
             <Detail
               label="Folder"
-              value="Chosen"
+              value={folderLabel(vm.billsFolder)}
               hint="Bills are written here as PDFs as they are saved. They stay on the phone even if this app is removed."
             />
             <Pressable
@@ -230,14 +245,14 @@ function ShopDetailsSheet({ vm }: { vm: ShopViewModel }) {
   const insets = useSafeAreaInsets();
 
   return (
-    <Modal visible={vm.isEditing} animationType="slide" onRequestClose={vm.cancelEditing}>
+    <Modal visible={vm.isEditing} animationType="slide" onRequestClose={() => closeEditing(vm)}>
       <KeyboardAvoidingView
         style={[styles.sheet, { paddingTop: insets.top + space.lg }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.sheetHead}>
           <Text style={styles.sheetTitle}>Shop details</Text>
-          <Pressable onPress={vm.cancelEditing} accessibilityRole="button" hitSlop={12}>
+          <Pressable onPress={() => closeEditing(vm)} accessibilityRole="button" hitSlop={12}>
             <Text style={styles.actionLabel}>Cancel</Text>
           </Pressable>
         </View>
@@ -271,7 +286,7 @@ function ShopDetailsSheet({ vm }: { vm: ShopViewModel }) {
             vm={vm}
             placeholder="Optional"
             autoCapitalize="characters"
-            hint="Needed only if you bill GST-registered customers"
+            hint="Your GST number. Bills print as tax invoices only when this is filled in."
           />
           <SheetField
             label="Bill prefix"
@@ -295,6 +310,20 @@ function ShopDetailsSheet({ vm }: { vm: ShopViewModel }) {
         </ScrollView>
       </KeyboardAvoidingView>
     </Modal>
+  );
+}
+
+/** Closes the details sheet, asking first if anything was changed. */
+function closeEditing(vm: ShopViewModel): void {
+  const saved = draftFromShop(vm.shop);
+  const changed = (Object.keys(saved) as (keyof typeof saved)[]).some(
+    (field) => vm.draft[field] !== saved[field],
+  );
+  confirmDiscard(
+    changed,
+    'Discard your changes?',
+    'The shop details have not been saved.',
+    vm.cancelEditing,
   );
 }
 
@@ -334,6 +363,7 @@ function SheetField({
         autoFocus={autoFocus}
         autoCorrect={false}
       />
+      {vm.fieldErrors[field] ? <Text style={styles.error}>{vm.fieldErrors[field]}</Text> : null}
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
     </View>
   );

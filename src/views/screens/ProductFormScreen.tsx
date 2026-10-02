@@ -14,12 +14,37 @@ import { CATEGORY_LABELS, ProductCategory } from '../../models/product';
 import { useProductFormViewModel } from '../../viewmodels/useProductFormViewModel';
 import { ChipSelector } from '../components/ChipSelector';
 import { FormField } from '../components/FormField';
+import { StockCard } from '../components/StockCard';
+import { useConfirmLeave } from '../confirmLeave';
 import { theme } from '../theme';
 
 const CATEGORY_OPTIONS = (Object.keys(CATEGORY_LABELS) as ProductCategory[]).map((value) => ({
   value,
   label: CATEGORY_LABELS[value],
 }));
+
+/**
+ * Examples that fit the product being entered. Every product once showed
+ * "Vitrified tile 2x2" at ₹450, which on a tap or a tin of paint reads as a
+ * mistake already made rather than a hint.
+ */
+const NAME_EXAMPLE: Record<ProductCategory, string> = {
+  marble: 'Makrana white marble',
+  granite: 'Black galaxy granite',
+  tiles: 'Vitrified tile 2x2',
+  putty: 'Birla wall putty 40kg',
+  paint: 'Asian Paints Apex',
+  sanitary: 'Jaquar pillar tap',
+  other: 'Ultratech cement 50kg',
+};
+
+const RATE_EXAMPLE: Record<UnitCode, string> = {
+  sqft: '120',
+  box: '450',
+  bag: '420',
+  litre: '380',
+  piece: '1250',
+};
 
 const UNIT_OPTIONS = ALL_UNITS.map((unit) => ({
   value: unit.code as UnitCode,
@@ -35,6 +60,11 @@ export function ProductFormScreen({
 }) {
   const vm = useProductFormViewModel(productId);
   const unit = unitFor(vm.draft.unitCode);
+  const allowLeave = useConfirmLeave(
+    vm.isDirty,
+    vm.isEditing ? 'Discard your changes?' : 'Discard this product?',
+    'Nothing you typed here has been saved.',
+  );
 
   if (vm.isLoading) {
     return (
@@ -54,7 +84,9 @@ export function ProductFormScreen({
 
   const submit = async () => {
     const saved = await vm.save();
-    if (saved) onSaved();
+    if (!saved) return;
+    allowLeave();
+    onSaved();
   };
 
   return (
@@ -63,11 +95,13 @@ export function ProductFormScreen({
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        {productId ? <StockCard productId={productId} /> : null}
+
         <FormField
           label="Product name"
           value={vm.draft.name}
           onChange={(v) => vm.setField('name', v)}
-          placeholder="Vitrified tile 2x2"
+          placeholder={NAME_EXAMPLE[vm.draft.category]}
           error={vm.errors.name}
         />
 
@@ -89,7 +123,7 @@ export function ProductFormScreen({
           label={`Rate per ${unit.label}`}
           value={vm.draft.salePrice}
           onChange={(v) => vm.setField('salePrice', v)}
-          placeholder="450"
+          placeholder={RATE_EXAMPLE[vm.draft.unitCode]}
           keyboardType="decimal-pad"
           error={vm.errors.salePrice}
         />

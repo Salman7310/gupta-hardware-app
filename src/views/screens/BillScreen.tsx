@@ -12,6 +12,7 @@ import {
   entryStyles as styles,
 } from '../components/LineEntry';
 import { ProductPicker } from '../components/ProductPicker';
+import { useConfirmLeave } from '../confirmLeave';
 import { BillStart, useBillViewModel } from '../../viewmodels/useBillViewModel';
 
 interface Props {
@@ -25,9 +26,23 @@ export function BillScreen({ onSaved, start }: Props) {
   const [isPicking, setIsPicking] = useState(false);
   const [isPickingCustomer, setIsPickingCustomer] = useState(false);
 
+  const hasWork =
+    !vm.isEmpty ||
+    vm.customer !== null ||
+    vm.draft.billDiscount.trim() !== '' ||
+    vm.draft.paid.trim() !== '' ||
+    vm.draft.notes.trim() !== '';
+  const allowLeave = useConfirmLeave(
+    hasWork,
+    'Discard this bill?',
+    'It has not been saved. The items and amounts you typed will be lost.',
+  );
+
   const submit = async () => {
     const saved = await vm.save();
-    if (saved) onSaved(saved);
+    if (!saved) return;
+    allowLeave();
+    onSaved(saved);
   };
 
   return (
@@ -107,6 +122,17 @@ export function BillScreen({ onSaved, start }: Props) {
           )}
           <TotalRow label="Total" value={vm.totals.grandTotal} emphasis />
         </View>
+
+        {vm.chargesGstWithoutGstin ? (
+          <View style={styles.gstWarning}>
+            <Text style={styles.gstWarningTitle}>No GSTIN on file</Text>
+            <Text style={styles.gstWarningBody}>
+              This bill charges GST, but the shop has no GSTIN saved. Only a GST-registered shop
+              may charge GST, and without one the bill is not printed as a tax invoice. Add the
+              GSTIN in the Shop tab, or set GST to 0 on these products.
+            </Text>
+          </View>
+        ) : null}
 
         {vm.errors.form ? <Text style={styles.formError}>{vm.errors.form}</Text> : null}
       </ScrollView>

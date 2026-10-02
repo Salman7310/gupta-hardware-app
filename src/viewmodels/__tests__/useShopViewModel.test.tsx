@@ -106,8 +106,26 @@ describe('the shop screen', () => {
     });
 
     expect(result.current.isEditing).toBe(true);
-    expect(result.current.error).toMatch(/mobile/i);
+    // Beside the Mobile field, not at the foot of the form.
+    expect(result.current.fieldErrors.phone).toBe('Use digits only, for example 98765 43210.');
     expect(reloads).toHaveLength(0);
+  });
+
+  it('reports every bad field at once, and clears each as it is corrected', async () => {
+    const { result } = await renderShop();
+    await act(async () => result.current.startEditing());
+    await act(async () => result.current.setField('name', ''));
+    await act(async () => result.current.setField('gstin', 'BAD'));
+    await act(async () => {
+      await result.current.save();
+    });
+
+    expect(result.current.fieldErrors.name).toBe('Enter the shop name');
+    expect(result.current.fieldErrors.gstin).toBe('GSTIN must be 15 letters or digits');
+
+    await act(async () => result.current.setField('name', 'Gupta Home Solutions'));
+    expect(result.current.fieldErrors.name).toBeUndefined();
+    expect(result.current.fieldErrors.gstin).toBeDefined();
   });
 
   /** A cancelled edit must not leave a half-typed name behind. */
@@ -196,5 +214,21 @@ describe('backing up from the shop screen', () => {
     });
 
     await waitFor(() => expect(result.current.billsFolder).not.toBeNull());
+  });
+
+  /**
+   * The common case: the folder is granted by Save PDF on a bill, nowhere near
+   * this screen. The tab said "Not chosen yet" while bills were being filed.
+   */
+  it('picks up a folder granted elsewhere when the tab is shown again', async () => {
+    const { result, documentFiler } = await renderWithBackup(null);
+    expect(result.current.billsFolder).toBeNull();
+
+    documentFiler.grantFolder();
+    await act(async () => {
+      await result.current.refreshFolder();
+    });
+
+    expect(result.current.billsFolder).toBe('content://folder/bills');
   });
 });

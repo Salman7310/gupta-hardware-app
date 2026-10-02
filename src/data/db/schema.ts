@@ -110,6 +110,8 @@ export const invoiceItems = sqliteTable(
     /** The measurement working printed under a marble line, as JSON. */
     dimensionsJson: text('dimensions_json'),
     linePaise: integer('line_paise').notNull(),
+    /** The product's HSN code at the time of sale; null for older rows. */
+    hsnCode: text('hsn_code'),
     ...syncColumns,
   },
   (t) => [index('invoice_items_invoice_idx').on(t.invoiceId)],
@@ -211,6 +213,8 @@ export const quotationItems = sqliteTable(
     unitCode: text('unit_code').notNull(),
     dimensionsJson: text('dimensions_json'),
     linePaise: integer('line_paise').notNull(),
+    /** The product's HSN code at the time of sale; null for older rows. */
+    hsnCode: text('hsn_code'),
     ...syncColumns,
   },
   (t) => [index('quotation_items_quotation_idx').on(t.quotationId)],

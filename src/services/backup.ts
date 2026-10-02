@@ -76,9 +76,20 @@ export function buildBackup(
   return { app: BACKUP_APP, format: BACKUP_FORMAT, createdAt, shopId, shopName, tables };
 }
 
-/** How many rows a backup holds, for the "restore this?" confirmation. */
+/**
+ * What the restore screen tells the owner they are about to get back.
+ *
+ * Rows marked deleted are left out. They are in the file on purpose — a
+ * deleted estimate is kept as a marker so another device can learn it went —
+ * but counting them said "Quotations 2" to a shop that could see one.
+ */
 export function countRows(tables: BackupTables): Readonly<Record<string, number>> {
-  return Object.fromEntries(Object.entries(tables).map(([name, rows]) => [name, rows.length]));
+  return Object.fromEntries(
+    Object.entries(tables).map(([name, rows]) => [
+      name,
+      rows.filter((row) => row.deleted_at === null || row.deleted_at === undefined).length,
+    ]),
+  );
 }
 
 export const billsInBackup = (file: BackupFile): number => file.tables.invoices?.length ?? 0;

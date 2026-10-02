@@ -8,6 +8,7 @@ import m0003 from './0003_tiresome_domino.sql';
 import m0004 from './0004_sparkling_kylun.sql';
 import m0005 from './0005_aspiring_tattoo.sql';
 import m0006 from './0006_majestic_the_santerians.sql';
+import m0007 from './0007_spotty_justin_hammer.sql';
 
   export default {
     journal,
@@ -18,7 +19,8 @@ m0002,
 m0003,
 m0004,
 m0005,
-m0006
+m0006,
+m0007
     }
   }
   

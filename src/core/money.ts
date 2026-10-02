@@ -84,8 +84,11 @@ export class Money {
     return `${sign}${groupIndian(String(rupees))}.${String(paise).padStart(2, '0')}`;
   }
 
+  /** "₹1,250.00", and "-₹0.40" for a negative: the sign before the symbol. */
   format(): string {
-    return `₹${this.toPlainString()}`;
+    return this.isNegative()
+      ? `-₹${this.negate().toPlainString()}`
+      : `₹${this.toPlainString()}`;
   }
 
   toString(): string {

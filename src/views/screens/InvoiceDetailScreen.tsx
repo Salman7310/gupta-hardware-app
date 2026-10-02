@@ -15,6 +15,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Money, formatDate, formatTime } from '../../core';
 import { Invoice, InvoiceItem } from '../../models/invoice';
 import { PAYMENT_METHODS, Payment, paymentMethodLabel } from '../../models/payment';
+import { taxLabel } from '../../services/document-html';
+import { confirmDiscard } from '../confirmLeave';
 import { InvoiceDetailViewModel, useInvoiceDetailViewModel } from '../../viewmodels/useInvoiceDetailViewModel';
 import { ChipSelector } from '../components/ChipSelector';
 import { HeaderMenu } from '../components/HeaderMenu';
@@ -231,13 +233,13 @@ export function InvoiceDetailScreen({ invoiceId }: Props) {
       <Modal
         visible={vm.isRecording}
         animationType="slide"
-        onRequestClose={vm.cancelRecording}
+        onRequestClose={() => closeRecording(vm)}
         transparent={false}
       >
         <RecordPayment vm={vm} />
       </Modal>
 
-      <Modal visible={vm.isAdding} animationType="slide" onRequestClose={vm.cancelAddingItems}>
+      <Modal visible={vm.isAdding} animationType="slide" onRequestClose={() => closeAdding(vm)}>
         <AddItemsSheet vm={vm} />
       </Modal>
     </>
@@ -257,7 +259,7 @@ function AddItemsSheet({ vm }: { vm: InvoiceDetailViewModel }) {
     <View style={[styles.sheet, { paddingTop: insets.top + space.lg }]}>
       <View style={styles.sheetHead}>
         <Text style={styles.sheetTitle}>Add to this bill</Text>
-        <Pressable onPress={vm.cancelAddingItems} accessibilityRole="button" hitSlop={12}>
+        <Pressable onPress={() => closeAdding(vm)} accessibilityRole="button" hitSlop={12}>
           <Text style={styles.sheetAction}>Cancel</Text>
         </Pressable>
       </View>
@@ -276,6 +278,7 @@ function AddItemsSheet({ vm }: { vm: InvoiceDetailViewModel }) {
               key={line.key}
               line={line}
               total={adding.lineTotals[line.key]?.total ?? null}
+              error={vm.addLineErrors[line.key]}
               onChange={(field, value) => adding.setLineField(line.key, field, value)}
               onRemove={() => adding.removeLine(line.key)}
               onDimensionChange={(dimensionKey, field, value) =>
@@ -292,7 +295,7 @@ function AddItemsSheet({ vm }: { vm: InvoiceDetailViewModel }) {
 
         {adding.isEmpty ? null : (
           <View style={styles.card}>
-            <TotalRow label="Adding" value={adding.totals.grandTotal} emphasis />
+            <TotalRow label="Adding" value={vm.addingAmount} emphasis />
           </View>
         )}
 
@@ -327,7 +330,7 @@ function RecordPayment({ vm }: { vm: InvoiceDetailViewModel }) {
     <View style={[styles.sheet, { paddingTop: insets.top + space.lg }]}>
       <View style={styles.sheetHead}>
         <Text style={styles.sheetTitle}>Record a payment</Text>
-        <Pressable onPress={vm.cancelRecording} accessibilityRole="button" hitSlop={12}>
+        <Pressable onPress={() => closeRecording(vm)} accessibilityRole="button" hitSlop={12}>
           <Text style={styles.sheetAction}>Cancel</Text>
         </Pressable>
       </View>
@@ -377,6 +380,26 @@ function RecordPayment({ vm }: { vm: InvoiceDetailViewModel }) {
         </Pressable>
       </ScrollView>
     </View>
+  );
+}
+
+/** Closes the add-items sheet, asking first if anything has been typed into it. */
+function closeAdding(vm: InvoiceDetailViewModel): void {
+  confirmDiscard(
+    !vm.adding.isEmpty,
+    'Discard the items you were adding?',
+    'They have not been added to the bill.',
+    vm.cancelAddingItems,
+  );
+}
+
+/** Closes the payment sheet, asking first if an amount or note has been typed. */
+function closeRecording(vm: InvoiceDetailViewModel): void {
+  confirmDiscard(
+    vm.draft.amount.trim() !== '' || vm.draft.note.trim() !== '',
+    'Discard this payment?',
+    'It has not been recorded against the bill.',
+    vm.cancelRecording,
   );
 }
 
@@ -448,6 +471,7 @@ function Receipt({ payment }: { payment: Payment }) {
 
 function Line({ item }: { item: InvoiceItem }) {
   const working = item.quantity.describeWorking();
+  const tax = taxLabel(item);
 
   return (
     <View style={styles.line}>
@@ -456,6 +480,7 @@ function Line({ item }: { item: InvoiceItem }) {
         <Text style={styles.lineDetail}>
           {item.quantity.toDisplay()} @ {item.rate.format()}
         </Text>
+        {tax ? <Text style={styles.working}>{tax}</Text> : null}
         {working ? <Text style={styles.working}>{working}</Text> : null}
         {item.discount.isZero() ? null : (
           <Text style={styles.working}>Less {item.discount.format()}</Text>

@@ -14,6 +14,7 @@ import { IdentityService } from '../services/identity';
 import { InvoiceNumberService } from '../services/invoice-number';
 import { PaymentBook } from '../services/payment';
 import { ProductCatalogue } from '../services/product-catalogue';
+import { StockBook } from '../services/stock-book';
 import {
   fixedClock,
   InMemoryDocumentFiler,
@@ -88,6 +89,7 @@ export function makeTestContainer(overrides: Partial<AppContainer> = {}): AppCon
       identity,
     ),
     catalogue: new ProductCatalogue(productRepository, stockRepository, ids, clock, 'shop-1'),
+    stockBook: new StockBook(stockRepository, ids, clock, 'shop-1'),
     customers: new CustomerBook(customerRepository, ids, clock, 'shop-1'),
     paymentBook: new PaymentBook(paymentRepository, ids, clock, 'shop-1'),
     billArchive: new BillArchive(filer, identity.shop),

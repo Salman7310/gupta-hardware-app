@@ -103,12 +103,45 @@ describe('validating a bill before it is saved', () => {
     expect(result.error.lines.k1).toMatch(/quantity/i);
   });
 
+  it('refuses a part box, saying why, instead of billing a rounded quantity', () => {
+    const result = validateBill(draftWith({ lines: [{ ...aLine(), quantity: '2.5' }] }));
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.lines.k1).toBe('This is sold by the box — enter a whole number.');
+  });
+
   it('refuses a quantity of zero', () => {
     const result = validateBill(draftWith({ lines: [{ ...aLine(), quantity: '0' }] }));
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.lines.k1).toMatch(/more than zero/i);
+  });
+
+  it('takes payment of exactly the bill total', () => {
+    // 2 box x 450 = 900, + 18% = 1,062.00
+    const result = validateBill(draftWith({ lines: [aLine()], paid: '1062' }));
+
+    expect(result.ok && result.value.paid.paise).toBe(106_200);
+  });
+
+  it('refuses more paid than the bill comes to, on the paid field', () => {
+    // The change handed back is not money taken against the bill.
+    const result = validateBill(draftWith({ lines: [aLine()], paid: '1063' }));
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.paid).toMatch(/more than the ₹1,062\.00 bill/);
+  });
+
+  it('measures an overpayment against the total after the lump-sum discount', () => {
+    // 900 - 50 = 850, + 18% = 1,003.00
+    const atTotal = validateBill(draftWith({ lines: [aLine()], billDiscount: '50', paid: '1003' }));
+    const over = validateBill(draftWith({ lines: [aLine()], billDiscount: '50', paid: '1004' }));
+
+    expect(atTotal.ok).toBe(true);
+    expect(over.ok).toBe(false);
   });
 
   it('refuses a discount that is not a number', () => {

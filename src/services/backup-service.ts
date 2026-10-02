@@ -85,7 +85,14 @@ export class BackupService {
    */
   async restore(file: BackupFile): Promise<Result<void, AppError>> {
     try {
+      // Restoring replaces the settings with the copy inside the backup, and
+      // that copy was taken a moment before the backup's own time was written
+      // down. Without this the Shop screen said "Nothing is backed up yet"
+      // straight after restoring from a backup that is still in the folder.
+      const before = await this.lastBackupAt();
       await this.rows.replaceAll(file.tables);
+      const latest = Math.max(before ?? 0, file.createdAt);
+      await this.settings.set(SETTINGS.lastBackupAt, String(latest));
       return ok(undefined);
     } catch (e) {
       return err(

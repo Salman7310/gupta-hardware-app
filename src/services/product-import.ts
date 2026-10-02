@@ -1,4 +1,4 @@
-import { Result, UnitCode, parseUnitAmount, unitFor } from '../core';
+import { Result, UnitCode, err, parseUnitAmount, unitFor } from '../core';
 import { ProductCategory } from '../models/product';
 import { normaliseHeader, parseCsv } from './csv';
 import {
@@ -6,6 +6,7 @@ import {
   ProductErrors,
   ValidatedProduct,
   emptyProductDraft,
+  normaliseProductName,
   validateProductDraft,
 } from './product';
 
@@ -95,14 +96,22 @@ const CATEGORY_ALIASES: Record<string, ProductCategory> = {
 export interface ImportRow {
   readonly line: number;
   readonly name: string;
-  readonly result: Result<ValidatedProduct, ProductErrors>;
+  readonly result: Result<ValidatedProduct, ImportRowErrors>;
   readonly openingStock: number | null;
-  /** True when the catalogue already holds a product with this name. */
+  /**
+   * True when the catalogue already holds a product with this name, or an
+   * earlier row of the same file does. Matched exactly as the import matches,
+   * so the preview's count is the number that will actually be imported.
+   */
   readonly isDuplicate: boolean;
 }
 
+/** A product's own errors, plus the one column that is not part of a product. */
+export type ImportRowErrors = ProductErrors & { readonly openingStock?: string };
+
 export interface ImportPreview {
   readonly rows: readonly ImportRow[];
+  /** Rows that read and are not already in the catalogue: what will be imported. */
   readonly valid: readonly ImportRow[];
   readonly invalid: readonly ImportRow[];
   readonly duplicates: readonly ImportRow[];
@@ -122,7 +131,9 @@ export function previewProductImport(
   text: string,
   existingNames: readonly string[] = [],
 ): ImportPreview {
-  const existing = new Set(existingNames.map((n) => n.trim().toLowerCase()));
+  const existing = new Set(existingNames.map(normaliseProductName));
+  // A name used by an earlier row of this same file is skipped on import too.
+  const seen = new Set<string>();
   const rows = parseCsv(text);
   if (rows.length === 0) {
     return { rows: [], valid: [], invalid: [], duplicates: [], missingColumns: ['name', 'rate'] };
@@ -167,22 +178,43 @@ export function previewProductImport(
       barcode: at(cells, columns.barcode),
     };
 
+    const unit = unitFor(unitCode);
     const openingRaw = at(cells, columns.openingStock);
-    const openingStock =
-      openingRaw.length > 0 ? parseUnitAmount(openingRaw, unitFor(unitCode)) : null;
+    const openingStock = openingRaw.length > 0 ? parseUnitAmount(openingRaw, unit) : null;
+
+    // An opening stock that will not read used to be dropped without a word,
+    // so the product arrived with nothing on the shelf. It is a row error now.
+    let openingProblem: string | null = null;
+    if (openingRaw.length > 0 && openingStock === null) {
+      openingProblem =
+        unit.entry === 'whole'
+          ? `Opening stock must be a whole number of ${unit.label}`
+          : 'Opening stock must be a number';
+    } else if (openingStock !== null && openingStock < 0) {
+      openingProblem = 'Opening stock cannot be below zero';
+    }
+
+    const validated = validateProductDraft(draft);
+    const result: Result<ValidatedProduct, ImportRowErrors> = openingProblem
+      ? err({ ...(validated.ok ? {} : validated.error), openingStock: openingProblem })
+      : validated;
+
+    const key = normaliseProductName(draft.name);
+    const isDuplicate = existing.has(key) || seen.has(key);
+    if (result.ok) seen.add(key);
 
     return {
       line: offset + 2,
       name: draft.name || '(no name)',
-      result: validateProductDraft(draft),
+      result,
       openingStock,
-      isDuplicate: existing.has(draft.name.trim().toLowerCase()),
+      isDuplicate,
     };
   });
 
   return {
     rows: parsed,
-    valid: parsed.filter((r) => r.result.ok),
+    valid: parsed.filter((r) => r.result.ok && !r.isDuplicate),
     invalid: parsed.filter((r) => !r.result.ok),
     duplicates: parsed.filter((r) => r.result.ok && r.isDuplicate),
     missingColumns: [],

@@ -64,3 +64,40 @@ describe('calculateBill across the shop’s real units', () => {
     expect(bill.cgst.add(bill.sgst).equals(bill.taxTotal)).toBe(true);
   });
 });
+
+/**
+ * CGST and SGST are each half the rate on the taxable value, rounded on their
+ * own. The bill below is the one from the QA pass on the emulator, which
+ * printed CGST ₹1,130.91 against SGST ₹1,130.88 when the odd paisa of every
+ * line went to CGST.
+ */
+describe('CGST and SGST', () => {
+  const qaBill = calculateBill(
+    [
+      line({ name: 'Kajaria Vitrified 2x2', quantity: Quantity.of(3, 'box'), rate: Money.fromRupees(460), taxRateBps: 1800 }),
+      line({ name: 'Makrana White Marble', quantity: Quantity.of(42.5 * 144, 'sqft'), rate: Money.fromRupees(120), taxRateBps: 1800 }),
+      line({ name: 'Ultratech Cement 50kg', quantity: Quantity.of(10, 'bag'), rate: Money.fromRupees(420), taxRateBps: 2800, discountBps: 500 }),
+    ],
+    Money.fromRupees(100),
+  );
+
+  it('prints the two halves equal on a bill of mixed rates and a lump-sum discount', () => {
+    expect(qaBill.cgst.paise).toBe(qaBill.sgst.paise);
+    // 123.01 + 454.62 + 553.26, each line's half worked out on its own
+    expect(qaBill.cgst.paise).toBe(113_089);
+    expect(qaBill.taxable.paise).toBe(1_037_000);
+    expect(qaBill.grandTotal.paise).toBe(1_263_200);
+  });
+
+  it('keeps the halves equal on every line too', () => {
+    for (const l of qaBill.lines) expect(l.cgst.paise).toBe(l.sgst.paise);
+  });
+
+  it('handles a rate that halves to a fraction of a basis point', () => {
+    // 0.25% on ₹1,000: 0.125% each way is ₹1.25
+    const result = calculateLine(line({ rate: Money.fromRupees(1000), taxRateBps: 25 }));
+    expect(result.cgst.paise).toBe(125);
+    expect(result.sgst.paise).toBe(125);
+    expect(result.tax.paise).toBe(250);
+  });
+});

@@ -17,6 +17,8 @@ export interface QuotationItem {
   /** What came off this line, including its share of a bill-level lump sum. */
   readonly discount: Money;
   readonly lineTotal: Money;
+  /** Carried so a bill made from this estimate has the HSN without a lookup. */
+  readonly hsnCode: string | null;
 }
 
 /**

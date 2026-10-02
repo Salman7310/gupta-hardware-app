@@ -13,6 +13,7 @@ import {
   partyBlock,
   shopBlock,
   totalRow,
+  gstSummary,
   totalsTable,
 } from './document-html';
 
@@ -84,7 +85,12 @@ export function renderBillHtml(doc: BillDocument): string {
     `    <header>
       ${shopBlock(shop)}
       <div>
-        <div class="doc-kind">Tax invoice</div>
+        <div class="doc-kind">${
+          // Only a GST-registered shop issues a tax invoice. Without a GSTIN
+          // on file the document is called a bill, rather than claiming to be
+          // something it cannot be.
+          shop.gstin ? 'Tax invoice' : 'Bill'
+        }</div>
         <div class="doc-no">${escape(invoice.invoiceNo)}</div>
         <div class="muted num">${escape(formatDate(invoice.issuedAt))} · ${escape(formatTime(invoice.issuedAt))}</div>
         ${
@@ -109,6 +115,8 @@ export function renderBillHtml(doc: BillDocument): string {
     ${itemTable(invoice.items)}
 
     ${totalsTable(totals)}
+
+    ${gstSummary(invoice.items)}
 
     ${paymentsBlock(payments)}
 

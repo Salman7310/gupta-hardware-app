@@ -111,4 +111,26 @@ describe('restoring a backup', () => {
     expect(rows.tables.products).toHaveLength(2);
     expect(rows.tables.invoices).toEqual([{ id: 'i1' }]);
   });
+
+  /**
+   * The settings inside a backup are a copy taken just before the backup's
+   * own time was written down, so restoring one wiped the record of it and
+   * the Shop screen said "Nothing is backed up yet" — right after a restore.
+   */
+  it('remembers the restored backup as one the shop has', async () => {
+    const { subject } = service(new InMemoryBackupFiler('content://f', onDisk));
+
+    await subject.restore(file);
+
+    expect(await subject.lastBackupAt()).toBe(NOW);
+  });
+
+  it('keeps a later backup time than the one restored', async () => {
+    const { subject, settings } = service(new InMemoryBackupFiler('content://f', onDisk));
+    await settings.set('backup.lastAt', String(NOW + 86_400_000));
+
+    await subject.restore(file);
+
+    expect(await subject.lastBackupAt()).toBe(NOW + 86_400_000);
+  });
 });

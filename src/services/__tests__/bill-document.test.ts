@@ -1,5 +1,5 @@
-import { Money } from '../../core';
-import { aCustomer, aPayment, aShop, anInvoice } from '../../testing/builders';
+import { Money, Quantity } from '../../core';
+import { aCustomer, aPayment, aShop, anInvoice, anInvoiceItem } from '../../testing/builders';
 import { billFileName, renderBillHtml } from '../bill-document';
 
 const doc = (over: Partial<Parameters<typeof renderBillHtml>[0]> = {}) =>
@@ -130,5 +130,62 @@ describe('the printed bill', () => {
     const html = doc();
     expect(html).not.toMatch(/https?:\/\//);
     expect(html).not.toContain('<img');
+  });
+});
+
+/**
+ * A tax invoice is expected to show each item's HSN code and rate of tax, and
+ * a bill that mixes rates cannot be checked against a single CGST figure.
+ */
+describe('tax detail on the printed bill', () => {
+  const tile = anInvoiceItem({
+    name: 'Kajaria Vitrified 2x2',
+    quantity: Quantity.of(3, 'box'),
+    rate: Money.fromRupees(460),
+    taxRateBps: 1800,
+    discount: Money.zero,
+    lineTotal: Money.fromRupees(1628.4),
+    hsnCode: '6907',
+  });
+  const cement = anInvoiceItem({
+    name: 'Ultratech Cement 50kg',
+    quantity: Quantity.of(10, 'bag'),
+    rate: Money.fromRupees(420),
+    taxRateBps: 2800,
+    discount: Money.fromRupees(210),
+    lineTotal: Money.fromRupees(5107.2),
+    hsnCode: '2523',
+  });
+
+  it('prints the HSN code and rate of tax under each item', () => {
+    const html = doc({ invoice: anInvoice({ items: [tile, cement] }) });
+    expect(html).toContain('HSN 6907 · GST 18%');
+    expect(html).toContain('HSN 2523 · GST 28%');
+  });
+
+  it('prints the rate alone for a line saved before HSN codes were kept', () => {
+    const html = doc({ invoice: anInvoice({ items: [{ ...tile, hsnCode: null }] }) });
+    expect(html).toContain('GST 18%');
+    expect(html).not.toContain('HSN ');
+  });
+
+  it('lists the tax by rate when the bill mixes rates', () => {
+    const html = doc({ invoice: anInvoice({ items: [tile, cement] }) });
+    expect(html).toContain('GST by rate');
+    // 18%: 1,380 taxed, 124.20 each way. 28%: 3,990 taxed, 558.60 each way.
+    expect(html).toMatch(/GST 18%<\/td>\s*<td class="num">₹1,380.00<\/td>\s*<td class="num">₹124.20<\/td>\s*<td class="num">₹124.20/);
+    expect(html).toMatch(/GST 28%<\/td>\s*<td class="num">₹3,990.00<\/td>\s*<td class="num">₹558.60<\/td>\s*<td class="num">₹558.60/);
+  });
+
+  it('leaves the rate summary off a bill at a single rate', () => {
+    expect(doc({ invoice: anInvoice({ items: [tile] }) })).not.toContain('GST by rate');
+  });
+
+  it('calls itself a tax invoice only when the shop has a GSTIN', () => {
+    expect(doc()).toContain('Tax invoice');
+
+    const unregistered = doc({ shop: aShop({ gstin: null }) });
+    expect(unregistered).not.toContain('Tax invoice');
+    expect(unregistered).toContain('<div class="doc-kind">Bill</div>');
   });
 });

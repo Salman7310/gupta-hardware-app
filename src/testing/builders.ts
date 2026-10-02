@@ -82,6 +82,7 @@ export function anInvoiceItem(over: Partial<InvoiceItem> = {}): InvoiceItem {
     discountBps: 0,
     discount: Money.zero,
     lineTotal: Money.fromRupees(4315.85),
+    hsnCode: '3209',
     ...over,
   };
 }
@@ -135,6 +136,7 @@ export function aQuotationItem(over: Partial<QuotationItem> = {}): QuotationItem
     discountBps: 0,
     discount: Money.zero,
     lineTotal: Money.fromRupees(4315.85),
+    hsnCode: '3209',
     ...over,
   };
 }

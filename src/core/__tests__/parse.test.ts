@@ -38,6 +38,28 @@ describe('parseUnitAmount', () => {
     expect(parseUnitAmount('5', unitFor('bag'))).toBe(5);
   });
 
+  /**
+   * These once rounded instead: 2.5 boxes parsed as 3 and 2.4 as 2, so a bill
+   * charged for a quantity nobody typed. A part box is refused outright.
+   */
+  it('refuses a part of a counted unit rather than rounding it', () => {
+    expect(parseUnitAmount('2.5', unitFor('box'))).toBeNull();
+    expect(parseUnitAmount('2.4', unitFor('box'))).toBeNull();
+    expect(parseUnitAmount('1.5', unitFor('bag'))).toBeNull();
+    expect(parseUnitAmount('0.5', unitFor('piece'))).toBeNull();
+    expect(parseUnitAmount('2.50', unitFor('box'))).toBeNull();
+  });
+
+  it('still takes a whole number written with a decimal point', () => {
+    expect(parseUnitAmount('3.0', unitFor('box'))).toBe(3);
+    expect(parseUnitAmount('4.00', unitFor('bag'))).toBe(4);
+  });
+
+  it('leaves measured units free to take decimals', () => {
+    expect(parseUnitAmount('2.5', unitFor('sqft'))).toBe(360);
+    expect(parseUnitAmount('4.5', unitFor('litre'))).toBe(4500);
+  });
+
   it('rejects rubbish', () => {
     expect(parseUnitAmount('', unitFor('box'))).toBeNull();
     expect(parseUnitAmount('two', unitFor('box'))).toBeNull();

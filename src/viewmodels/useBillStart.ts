@@ -14,7 +14,7 @@ export function useBillStart(quotationId?: string): {
   isLoading: boolean;
   start: BillStart | undefined;
 } {
-  const { quotations, customerRepository, ids } = useContainer();
+  const { quotations, customerRepository, productRepository, ids } = useContainer();
   const [start, setStart] = useState<BillStart | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(Boolean(quotationId));
 
@@ -34,16 +34,25 @@ export function useBillStart(quotationId?: string): {
           : null;
         if (cancelled) return;
 
-        setStart({
-          draft: draftFromQuotation(
-            quotation.items,
-            quotation.billDiscount,
-            quotation.notes,
-            () => ids.next(),
-          ),
-          customer,
-          quotation,
-        });
+        const draft = draftFromQuotation(
+          quotation.items,
+          quotation.billDiscount,
+          quotation.notes,
+          () => ids.next(),
+        );
+
+        // Estimates saved before HSN codes were carried have none. The bill is
+        // a tax invoice, so the code is taken from the product as it is now.
+        const lines = await Promise.all(
+          draft.lines.map(async (line) => {
+            if (line.hsnCode) return line;
+            const product = await productRepository.findById(line.productId);
+            return { ...line, hsnCode: product?.hsnCode ?? null };
+          }),
+        );
+        if (cancelled) return;
+
+        setStart({ draft: { ...draft, lines }, customer, quotation });
       } finally {
         // A quotation that cannot be read still leaves a usable blank bill,
         // which is better at a counter than a screen that refuses to open.
@@ -55,7 +64,7 @@ export function useBillStart(quotationId?: string): {
     return () => {
       cancelled = true;
     };
-  }, [quotations, customerRepository, ids, quotationId]);
+  }, [quotations, customerRepository, productRepository, ids, quotationId]);
 
   return { isLoading, start };
 }

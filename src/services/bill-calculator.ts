@@ -14,12 +14,16 @@ function taxed(input: LineItemInput, billDiscountShare: Money): CalculatedLine {
   const gross = input.rate.multiplyByScaled(input.quantity.amount, input.quantity.unit.scale);
   const discount = gross.percentage(input.discountBps);
   const taxable = gross.subtract(discount).subtract(billDiscountShare);
-  const tax = taxable.percentage(input.taxRateBps);
 
-  // Halve each line's tax rather than the bill total, so CGST and SGST always
-  // add back up to the tax charged, to the paisa.
-  const cgst = Money.fromPaise(divideRoundHalfUp(tax.paise, 2));
-  const sgst = tax.subtract(cgst);
+  // CGST and SGST are two levies at half the rate each, each worked out on the
+  // taxable value and rounded on its own — so they are always equal, as an
+  // accountant expects to see them. Rounding the whole tax first and halving it
+  // gave every odd paisa to CGST, and a bill of several lines printed CGST a
+  // few paise above SGST. The half rate is applied in one integer division
+  // (taxable x rate / 20,000) because 0.25% halves to 12.5 basis points.
+  const cgst = Money.fromPaise(divideRoundHalfUp(taxable.paise * input.taxRateBps, 20_000));
+  const sgst = cgst;
+  const tax = cgst.add(sgst);
 
   return {
     input,

@@ -75,6 +75,30 @@ export class BillArchive {
     );
   }
 
+  /**
+   * Files the bill again after it has changed — a payment, more items, a
+   * cancellation — so the copy in the shop's folder says what the bill says
+   * now. Without this the folder, which is the record meant to outlive the
+   * app, kept a cancelled bill as "Paid" and a settled one as "Unpaid".
+   *
+   * Only into a folder already chosen. Recording a payment is the wrong moment
+   * to put a system folder picker in front of someone at the counter; that
+   * prompt belongs to Save PDF. Returns null when there is no folder yet.
+   */
+  async refile(
+    invoice: Invoice,
+    customer: Customer | null,
+    payments: readonly Payment[],
+  ): Promise<string | null> {
+    if (!(await this.filer.chosenFolder())) return null;
+    return this.keep(invoice, customer, payments);
+  }
+
+  /** Whether this bill has a copy in the shop's folder, written from this phone. */
+  isFiled(invoice: Invoice): Promise<boolean> {
+    return this.filer.isKept(billFileName(invoice));
+  }
+
   /** Returns where it was written, or null if no folder has been granted. */
   async keep(
     invoice: Invoice,

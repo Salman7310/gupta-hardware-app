@@ -15,6 +15,7 @@ import {
   unitFor,
 } from '../core';
 import { LineItemInput } from '../models/invoice';
+import { calculateBill } from './bill-calculator';
 import { Product } from '../models/product';
 
 /**
@@ -47,6 +48,8 @@ export interface BillLineDraft {
   readonly unitCode: UnitCode;
   readonly rate: Money;
   readonly taxRateBps: number;
+  /** Copied from the product when the line is added, for the tax invoice. */
+  readonly hsnCode: string | null;
   /** The quantity as a plain number, in the unit's own terms. */
   readonly quantity: string;
   /**
@@ -145,6 +148,7 @@ export function lineFromProduct(product: Product, key: string): BillLineDraft {
     unitCode: product.unitCode,
     rate: product.salePrice,
     taxRateBps: product.taxRateBps,
+    hsnCode: product.hsnCode,
     quantity: '',
     // Typing the total is the common case, including for stone. Measuring is
     // a deliberate switch, taken when the pieces are being cut and checked.
@@ -201,6 +205,7 @@ export function toLineItem(line: BillLineDraft): LineItemInput | null {
     quantity,
     rate: line.rate,
     taxRateBps: line.taxRateBps,
+    hsnCode: line.hsnCode,
     discountBps,
   };
 }
@@ -255,9 +260,14 @@ export function validateLines(drafts: readonly BillLineDraft[]): ValidatedLines 
       continue;
     }
 
-    const amount = parseUnitAmount(line.quantity, unitFor(line.unitCode));
+    const unit = unitFor(line.unitCode);
+    const amount = parseUnitAmount(line.quantity, unit);
     if (amount === null) {
-      errors[line.key] = 'Enter a quantity.';
+      // A part box reads as a number, so "Enter a quantity" would be a lie.
+      errors[line.key] =
+        unit.entry === 'whole' && /^\s*\d+\.\d+\s*$/.test(line.quantity)
+          ? `This is sold by the ${unit.code} — enter a whole number.`
+          : 'Enter a quantity.';
       continue;
     }
     if (amount <= 0) {
@@ -301,6 +311,18 @@ export function validateBill(draft: BillDraft): Result<ValidatedBill, BillErrors
   if (Object.keys(lines).length > 0) return err({ lines });
   if (parsed.length === 0) {
     return err({ lines, form: 'Add at least one item before saving the bill.' });
+  }
+
+  // The same rule as recording a payment later: what is taken against a bill
+  // cannot be more than the bill. A customer who hands over ₹2,000 for a
+  // ₹1,475 bill gets change; booking the whole ₹2,000 would overstate the
+  // day's cash and print "Paid ₹2,000" on a ₹1,475 invoice.
+  const total = calculateBill(parsed, discount.value).grandTotal;
+  if (paid.compare(total) > 0) {
+    return err({
+      lines,
+      paid: `That is more than the ${total.format()} bill. Enter only what goes towards it.`,
+    });
   }
 
   const notes = draft.notes.trim();

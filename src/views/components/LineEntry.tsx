@@ -253,6 +253,16 @@ export const entryStyles = StyleSheet.create({
   },
   totals: { ...card, padding: space.lg, gap: space.md },
   formError: { ...type.body, color: theme.danger, textAlign: 'center' },
+  gstWarning: {
+    borderWidth: 1,
+    borderColor: theme.warningText,
+    backgroundColor: theme.warningBg,
+    borderRadius: 10,
+    padding: space.lg,
+    gap: space.xs,
+  },
+  gstWarningTitle: { ...type.bodyStrong, color: theme.warningText },
+  gstWarningBody: { ...type.caption, color: theme.warningText, lineHeight: 20 },
   note: {
     ...card,
     padding: space.md,

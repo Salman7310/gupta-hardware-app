@@ -25,6 +25,17 @@ export const SECURE = {
   databaseKey: 'database.key',
 } as const;
 
+/**
+ * Where a document was last written in the shop's folder, by file name.
+ *
+ * A bill is filed again whenever it changes — a payment, more items, a
+ * cancellation — and the folder should hold its latest state once, not a
+ * "GH-A-0001 (1).pdf" beside the stale one. Remembering the uri is what lets
+ * the old copy be found on any storage provider, including ones whose uris do
+ * not carry the file's name.
+ */
+export const filedDocumentKey = (fileName: string): string => `files.${fileName}`;
+
 /** One counter per device letter, so each invoice series stays consecutive. */
 export const invoiceSequenceKey = (letter: string): string => `invoice.seq.${letter}`;
 

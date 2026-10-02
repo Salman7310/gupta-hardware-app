@@ -1,6 +1,7 @@
 import { Id, Result, err, ok } from '../core';
 import { Customer } from '../models/customer';
 import { Clock, CustomerRepository, IdGenerator } from './ports';
+import { phoneProblem } from './phone';
 
 export interface CustomerDraft {
   readonly name: string;
@@ -46,9 +47,8 @@ export function validateCustomerDraft(
   if (name.length === 0) errors.name = 'Enter the customer name.';
 
   const phone = draft.phone.replace(/[\s-]/g, '');
-  if (phone.length > 0 && !/^\+?\d{7,15}$/.test(phone)) {
-    errors.phone = 'Enter the phone number in digits.';
-  }
+  const phoneError = phoneProblem(phone);
+  if (phoneError) errors.phone = phoneError;
 
   // Same rule as the shop's own GSTIN. A wrong one on a bill is the customer's
   // input tax credit lost, so it is checked rather than taken on trust.

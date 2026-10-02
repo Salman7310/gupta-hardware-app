@@ -11,6 +11,7 @@ import {
   emptyQuotationDraft,
   validateQuotation,
 } from '../services/quotation';
+import { useLineCommands } from './useLineCommands';
 import { useLineEntry } from './useLineEntry';
 
 const NO_ERRORS: QuotationErrors = { lines: {} };
@@ -54,8 +55,8 @@ export interface QuotationViewModel {
 export function useQuotationViewModel(): QuotationViewModel {
   const { createQuotation } = useContainer();
   const empty = emptyQuotationDraft();
-  const [billDiscount, setBillDiscount] = useState(empty.billDiscount);
-  const [validDays, setValidDays] = useState(empty.validDays);
+  const [billDiscount, setBillDiscountValue] = useState(empty.billDiscount);
+  const [validDays, setValidDaysValue] = useState(empty.validDays);
   const [notes, setNotes] = useState(empty.notes);
   const [errors, setErrors] = useState<QuotationErrors>(NO_ERRORS);
   const [isSaving, setIsSaving] = useState(false);
@@ -64,6 +65,19 @@ export function useQuotationViewModel(): QuotationViewModel {
   const discount = useMemo(() => readableBillDiscount(billDiscount), [billDiscount]);
   const entry = useLineEntry(discount);
   const { replaceAll } = entry;
+  const commands = useLineCommands(entry, setErrors);
+
+  // Each clears its own error as it is edited, as the lines do.
+  const setBillDiscount = useCallback((value: string) => {
+    setBillDiscountValue(value);
+    setErrors((e) =>
+      e.billDiscount || e.form ? { ...e, billDiscount: undefined, form: undefined } : e,
+    );
+  }, []);
+  const setValidDays = useCallback((value: string) => {
+    setValidDaysValue(value);
+    setErrors((e) => (e.validDays ? { ...e, validDays: undefined } : e));
+  }, []);
 
   const draft = useMemo<QuotationDraft>(
     () => ({ lines: entry.lines, billDiscount, validDays, notes }),
@@ -94,8 +108,8 @@ export function useQuotationViewModel(): QuotationViewModel {
 
       const fresh = emptyQuotationDraft();
       replaceAll([]);
-      setBillDiscount(fresh.billDiscount);
-      setValidDays(fresh.validDays);
+      setBillDiscountValue(fresh.billDiscount);
+      setValidDaysValue(fresh.validDays);
       setNotes(fresh.notes);
       setErrors(NO_ERRORS);
       setCustomer(null);
@@ -115,18 +129,12 @@ export function useQuotationViewModel(): QuotationViewModel {
       isEmpty: entry.isEmpty,
       customer,
       setCustomer,
-      addProduct: entry.addProduct,
-      removeLine: entry.removeLine,
-      setLineField: entry.setLineField,
-      addDimension: entry.addDimension,
-      removeDimension: entry.removeDimension,
-      setDimensionField: entry.setDimensionField,
-      setMeasuring: entry.setMeasuring,
+      ...commands,
       setBillDiscount,
       setValidDays,
       setNotes,
       save,
     }),
-    [draft, entry, errors, isSaving, customer, save],
+    [draft, entry, commands, errors, isSaving, customer, setBillDiscount, setValidDays, save],
   );
 }

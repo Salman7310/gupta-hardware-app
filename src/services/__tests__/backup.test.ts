@@ -83,3 +83,24 @@ describe('reading a backup back', () => {
     expect(!result.ok && result.error.code).toBe('backup.empty');
   });
 });
+
+/**
+ * The restore screen once said "Quotations 2" for a shop that could see one:
+ * the deleted estimate is kept in the file as a marker, and was counted.
+ */
+describe('what the restore screen says is in a backup', () => {
+  it('leaves out rows marked deleted', () => {
+    const counts = countRows({
+      quotations: [
+        { id: 'q-1', deleted_at: null },
+        { id: 'q-2', deleted_at: 1_700_000_000_000 },
+      ],
+      invoices: [{ id: 'inv-1', deleted_at: null }],
+    });
+    expect(counts).toEqual({ quotations: 1, invoices: 1 });
+  });
+
+  it('counts a row with no deleted_at column at all', () => {
+    expect(countRows({ settings: [{ key: 'shop.name', value: 'Gupta' }] })).toEqual({ settings: 1 });
+  });
+});

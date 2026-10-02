@@ -2,11 +2,27 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Money } from '../core';
 import { useContainer } from '../di/provider';
 import { Customer } from '../models/customer';
-import { BillState, Invoice, amountDue, billState, isCancelled } from '../models/invoice';
+import {
+  BillState,
+  Invoice,
+  amountDue,
+  billState,
+  isCancelled,
+  toLineInput,
+} from '../models/invoice';
 import { Payment, PaymentMethod } from '../models/payment';
 import { PaymentDraft, PaymentErrors, emptyPaymentDraft } from '../services/payment';
 import { readableBillDiscount, validateLines } from '../services/bill';
+import { useLineCommands } from './useLineCommands';
 import { LineEntry, useLineEntry } from './useLineEntry';
+
+const RECENTLY_MADE_MS = 60_000;
+
+interface AddErrors {
+  readonly lines: Readonly<Record<string, string>>;
+  readonly form?: string;
+}
+const NO_ADD_ERRORS: AddErrors = { lines: {} };
 
 export interface InvoiceDetailViewModel {
   readonly invoice: Invoice | null;
@@ -49,7 +65,11 @@ export interface InvoiceDetailViewModel {
    */
   readonly isAdding: boolean;
   readonly adding: LineEntry;
+  /** What the bill's total will rise by if the lines being typed are saved. */
+  readonly addingAmount: Money;
   readonly addError: string | null;
+  /** Why a line being added will not read, by its key, shown on that row. */
+  readonly addLineErrors: Readonly<Record<string, string>>;
   readonly isSavingItems: boolean;
   startAddingItems(): void;
   cancelAddingItems(): void;
@@ -86,6 +106,7 @@ export function useInvoiceDetailViewModel(invoiceId: string): InvoiceDetailViewM
     billArchive,
     amendInvoice,
     cancelInvoice,
+    clock,
   } = useContainer();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -109,7 +130,12 @@ export function useInvoiceDetailViewModel(invoiceId: string): InvoiceDetailViewM
   const [revision, setRevision] = useState(0);
 
   const [isAdding, setIsAdding] = useState(false);
-  const [addError, setAddError] = useState<string | null>(null);
+  // Same shape as a bill's errors, so editing a row clears what it caused.
+  const [addErrors, setAddErrors] = useState<AddErrors>(NO_ADD_ERRORS);
+  const setAddError = useCallback(
+    (form: string | null) => setAddErrors(form ? { lines: {}, form } : NO_ADD_ERRORS),
+    [],
+  );
   const [isSavingItems, setIsSavingItems] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
@@ -119,8 +145,24 @@ export function useInvoiceDetailViewModel(invoiceId: string): InvoiceDetailViewM
     () => readableBillDiscount(invoice ? invoice.billDiscount.toPlainString() : ''),
     [invoice],
   );
-  const adding = useLineEntry(billDiscount);
-  const { replaceAll } = adding;
+  // The lines already on the bill, re-entered exactly as AmendInvoice will.
+  // The preview runs the same whole-bill calculation the save does, so the
+  // figure the shopkeeper reads out is the figure the bill will rise by.
+  const existingLines = useMemo(() => (invoice ? invoice.items.map(toLineInput) : []), [invoice]);
+  const addingEntry = useLineEntry(billDiscount, [], existingLines);
+  const addingCommands = useLineCommands(addingEntry, setAddErrors);
+  const adding = useMemo<LineEntry>(
+    () => ({ ...addingEntry, ...addingCommands }),
+    [addingEntry, addingCommands],
+  );
+  const { replaceAll } = addingEntry;
+  const addingAmount = useMemo(
+    () =>
+      invoice && !adding.isEmpty
+        ? adding.totals.grandTotal.subtract(invoice.grandTotal)
+        : Money.zero,
+    [invoice, adding.isEmpty, adding.totals],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -156,6 +198,38 @@ export function useInvoiceDetailViewModel(invoiceId: string): InvoiceDetailViewM
     };
   }, [invoiceRepository, customerRepository, paymentBook, invoiceId, revision]);
 
+  // A bill that missed being filed is filed when it is opened. Filing when a
+  // bill is made is quiet by design, so a failure there was silent too, and
+  // the folder simply lacked the bill. Once per opening, not on every re-read:
+  // a payment, more items or a cancel files the bill itself.
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const found = await invoiceRepository.findById(invoiceId);
+        if (cancelled || !found) return;
+        // A bill made in the last minute is still being filed by the screen
+        // that made it; filing it here as well would only do the work twice.
+        if (clock.now() - found.issuedAt < RECENTLY_MADE_MS) return;
+        if (!(await billArchive.chosenFolder())) return;
+        if (await billArchive.isFiled(found)) return;
+
+        const receipts = await paymentBook.listFor(found.id);
+        const named = found.customerId
+          ? await customerRepository.findById(found.customerId)
+          : null;
+        if (cancelled) return;
+        await billArchive.refile(found, named, receipts);
+      } catch {
+        // Save PDF is still there, and says so if it fails.
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [invoiceRepository, customerRepository, paymentBook, billArchive, clock, invoiceId]);
+
   const startRecording = useCallback(() => {
     setDraft(emptyPaymentDraft());
     setErrors({});
@@ -183,6 +257,20 @@ export function useInvoiceDetailViewModel(invoiceId: string): InvoiceDetailViewM
     setDraft((current) => ({ ...current, note: value }));
   }, []);
 
+  // Reads the bill back from storage rather than using what is in state, which
+  // is about to be replaced by the same read the screen does on `revision`.
+  const refileQuietly = useCallback(async () => {
+    try {
+      const fresh = await invoiceRepository.findById(invoiceId);
+      if (!fresh) return;
+      const receipts = await paymentBook.listFor(fresh.id);
+      await billArchive.refile(fresh, customer, receipts);
+    } catch {
+      // The change itself is saved. A copy that failed to write is put right
+      // by Save PDF, and must never look like a failed payment or cancel.
+    }
+  }, [invoiceRepository, invoiceId, paymentBook, billArchive, customer]);
+
   const record = useCallback(async (): Promise<boolean> => {
     if (!invoice) return false;
     setIsSaving(true);
@@ -196,11 +284,12 @@ export function useInvoiceDetailViewModel(invoiceId: string): InvoiceDetailViewM
       setErrors({});
       setDraft(emptyPaymentDraft());
       setRevision((n) => n + 1);
+      void refileQuietly();
       return true;
     } finally {
       setIsSaving(false);
     }
-  }, [invoice, draft, paymentBook]);
+  }, [invoice, draft, paymentBook, refileQuietly]);
 
   useEffect(() => {
     let cancelled = false;
@@ -262,20 +351,22 @@ export function useInvoiceDetailViewModel(invoiceId: string): InvoiceDetailViewM
     replaceAll([]);
     setAddError(null);
     setIsAdding(true);
-  }, [replaceAll]);
+  }, [replaceAll, setAddError]);
 
   const cancelAddingItems = useCallback(() => {
     setIsAdding(false);
     setAddError(null);
     replaceAll([]);
-  }, [replaceAll]);
+  }, [replaceAll, setAddError]);
 
   const confirmAddedItems = useCallback(async (): Promise<boolean> => {
     if (!invoice) return false;
 
     const { errors, parsed } = validateLines(adding.lines);
     if (Object.keys(errors).length > 0) {
-      setAddError('Finish the lines that are not complete.');
+      // Kept per line, so the row says what is wrong with it: a part box and
+      // a missing quantity need different fixes.
+      setAddErrors({ lines: errors, form: 'Finish the lines marked below.' });
       return false;
     }
     if (parsed.length === 0) {
@@ -296,11 +387,12 @@ export function useInvoiceDetailViewModel(invoiceId: string): InvoiceDetailViewM
       // Read the bill back rather than trusting what was returned: the totals
       // and every line's share of the discount have moved.
       setRevision((n) => n + 1);
+      void refileQuietly();
       return true;
     } finally {
       setIsSavingItems(false);
     }
-  }, [invoice, adding.lines, amendInvoice, replaceAll]);
+  }, [invoice, adding.lines, amendInvoice, replaceAll, refileQuietly, setAddError]);
 
   const dismissFileNotice = useCallback(() => {
     setSavedTo(null);
@@ -319,11 +411,12 @@ export function useInvoiceDetailViewModel(invoiceId: string): InvoiceDetailViewM
       setCancelError(null);
       // Read it back: the stock it took has gone the other way too.
       setRevision((n) => n + 1);
+      void refileQuietly();
       return true;
     } finally {
       setIsCancelling(false);
     }
-  }, [invoice, cancelInvoice]);
+  }, [invoice, cancelInvoice, refileQuietly]);
 
   const dismissCancelError = useCallback(() => setCancelError(null), []);
 
@@ -358,7 +451,9 @@ export function useInvoiceDetailViewModel(invoiceId: string): InvoiceDetailViewM
       dismissFileNotice,
       isAdding,
       adding,
-      addError,
+      addingAmount,
+      addError: addErrors.form ?? null,
+      addLineErrors: addErrors.lines,
       isSavingItems,
       startAddingItems,
       cancelAddingItems,
@@ -401,7 +496,8 @@ export function useInvoiceDetailViewModel(invoiceId: string): InvoiceDetailViewM
       record,
       isAdding,
       adding,
-      addError,
+      addingAmount,
+      addErrors,
       isSavingItems,
       startAddingItems,
       cancelAddingItems,

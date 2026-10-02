@@ -2,6 +2,7 @@ import { AppError, appError, Id, Result, err, ok } from '../core';
 import { DeviceIdentity, Shop } from '../models/shop';
 import { IdGenerator, SecureKeyStore, SettingsRepository } from './ports';
 import { SECURE, SETTINGS } from './settings-keys';
+import { phoneProblem } from './phone';
 
 export interface Identity {
   readonly shop: Shop;
@@ -28,41 +29,105 @@ export interface ShopSetupInput extends ShopDetailsInput {
 
 const GSTIN_LENGTH = 15;
 
+export type ShopField = keyof ShopSetupInput;
+
+interface FieldCheck {
+  readonly field: ShopField;
+  readonly code: string;
+  readonly check: (input: ShopSetupInput) => string | null;
+}
+
+/**
+ * One rule per field, in the order a form reads. Kept as a list so the form
+ * can show every problem beside its own field at once, while registering and
+ * saving still refuse on the first — the two can never disagree about a rule.
+ */
+const DETAIL_CHECKS: readonly FieldCheck[] = [
+  {
+    field: 'name',
+    code: 'shop.name.required',
+    check: (i) => (i.name.trim().length === 0 ? 'Enter the shop name' : null),
+  },
+  {
+    field: 'phone',
+    code: 'shop.phone.invalid',
+    // Same rule as a customer's number: digits, optionally with a country code.
+    check: (i) => phoneProblem(i.phone),
+  },
+  {
+    field: 'gstin',
+    code: 'shop.gstin.invalid',
+    check: (i) => {
+      const gstin = i.gstin.trim().toUpperCase();
+      return gstin.length > 0 && !/^[0-9A-Z]{15}$/.test(gstin)
+        ? `GSTIN must be ${GSTIN_LENGTH} letters or digits`
+        : null;
+    },
+  },
+  {
+    field: 'invoicePrefix',
+    code: 'shop.prefix.invalid',
+    check: (i) =>
+      /^[A-Z0-9]{1,6}$/.test(i.invoicePrefix.trim().toUpperCase())
+        ? null
+        : 'Bill prefix must be 1 to 6 letters or digits',
+  },
+];
+
+const LETTER_CHECK: FieldCheck = {
+  field: 'deviceLetter',
+  code: 'device.letter.invalid',
+  check: (i) =>
+    /^[A-Z]$/.test(i.deviceLetter.trim().toUpperCase())
+      ? null
+      : 'Counter letter must be a single letter A to Z',
+};
+
+/** Every problem with the form, by field, for showing beside each field. */
+export function shopFieldErrors(
+  input: ShopDetailsInput | ShopSetupInput,
+): Partial<Record<ShopField, string>> {
+  const full: ShopSetupInput = { deviceLetter: 'A', ...input };
+  const checks = 'deviceLetter' in input ? [...DETAIL_CHECKS, LETTER_CHECK] : DETAIL_CHECKS;
+  const errors: Partial<Record<ShopField, string>> = {};
+  for (const { field, check } of checks) {
+    const problem = check(full);
+    if (problem) errors[field] = problem;
+  }
+  return errors;
+}
+
+function firstProblem(input: ShopSetupInput, checks: readonly FieldCheck[]): AppError | null {
+  for (const { code, check } of checks) {
+    const problem = check(input);
+    if (problem) return appError(code, problem);
+  }
+  return null;
+}
+
 export function validateShopDetails(
   input: ShopDetailsInput,
 ): Result<ShopDetailsInput, AppError> {
-  const name = input.name.trim();
-  if (name.length === 0) return err(appError('shop.name.required', 'Enter the shop name'));
+  const problem = firstProblem({ deviceLetter: 'A', ...input }, DETAIL_CHECKS);
+  if (problem) return err(problem);
 
-  const invoicePrefix = input.invoicePrefix.trim().toUpperCase();
-  if (!/^[A-Z0-9]{1,6}$/.test(invoicePrefix)) {
-    return err(appError('shop.prefix.invalid', 'Bill prefix must be 1 to 6 letters or digits'));
-  }
-
-  // Same rule as a customer's number: digits, optionally with a country code.
-  const phone = input.phone.replace(/[\s-]/g, '');
-  if (phone.length > 0 && !/^\+?\d{7,15}$/.test(phone)) {
-    return err(appError('shop.phone.invalid', 'Enter the shop mobile number in digits'));
-  }
-
-  const gstin = input.gstin.trim().toUpperCase();
-  if (gstin.length > 0 && !/^[0-9A-Z]{15}$/.test(gstin)) {
-    return err(appError('shop.gstin.invalid', `GSTIN must be ${GSTIN_LENGTH} letters or digits`));
-  }
-
-  return ok({ name, address: input.address.trim(), phone, gstin, invoicePrefix });
+  return ok({
+    name: input.name.trim(),
+    address: input.address.trim(),
+    phone: input.phone.replace(/[\s-]/g, ''),
+    gstin: input.gstin.trim().toUpperCase(),
+    invoicePrefix: input.invoicePrefix.trim().toUpperCase(),
+  });
 }
 
 export function validateShopSetup(input: ShopSetupInput): Result<ShopSetupInput, AppError> {
   const details = validateShopDetails(input);
   if (!details.ok) return details;
 
-  const deviceLetter = input.deviceLetter.trim().toUpperCase();
-  if (!/^[A-Z]$/.test(deviceLetter)) {
-    return err(appError('device.letter.invalid', 'Counter letter must be a single letter A to Z'));
-  }
+  const problem = firstProblem(input, [LETTER_CHECK]);
+  if (problem) return err(problem);
 
-  return ok({ ...details.value, deviceLetter });
+  return ok({ ...details.value, deviceLetter: input.deviceLetter.trim().toUpperCase() });
 }
 
 /**

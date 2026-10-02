@@ -193,6 +193,12 @@ export interface DocumentFiler {
    * uninstall has lost its records.
    */
   keep(fileUri: string, fileName: string): Promise<string | null>;
+  /**
+   * Whether this document has been filed from this phone. A bill that missed
+   * being filed when it was made — the write is quiet, so a failure is too —
+   * is filed when it is next opened.
+   */
+  isKept(fileName: string): Promise<boolean>;
   /** Whether a folder has already been chosen, so the UI can say where files go. */
   chosenFolder(): Promise<string | null>;
   /** Forgets the folder, so the next save asks again. */

@@ -115,6 +115,7 @@ function lineFromItem(item: QuotationItem, productId: string, key: () => string)
     unitCode: item.quantity.unit.code,
     rate: item.rate,
     taxRateBps: item.taxRateBps,
+    hsnCode: item.hsnCode,
     quantity: measured ? '' : item.quantity.toDisplayNumber(),
     measured,
     dimensions: measured ? item.quantity.dimensions.map((d) => dimensionDraft(d, key())) : [],

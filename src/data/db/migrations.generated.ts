@@ -66,6 +66,13 @@ const journal: Journal = {
       "when": 1790581201905,
       "tag": "0006_majestic_the_santerians",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1790874532109,
+      "tag": "0007_spotty_justin_hammer",
+      "breakpoints": true
     }
   ]
 };
@@ -78,6 +85,7 @@ const migrations: Record<string, string> = {
   m0004: "CREATE TABLE `quotation_items` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`quotation_id` text NOT NULL,\n\t`product_id` text,\n\t`name_snapshot` text NOT NULL,\n\t`rate_paise` integer NOT NULL,\n\t`tax_rate_bps` integer DEFAULT 0 NOT NULL,\n\t`discount_bps` integer DEFAULT 0 NOT NULL,\n\t`discount_paise` integer DEFAULT 0 NOT NULL,\n\t`quantity_amount` integer NOT NULL,\n\t`unit_code` text NOT NULL,\n\t`dimensions_json` text,\n\t`line_paise` integer NOT NULL,\n\t`shop_id` text NOT NULL,\n\t`device_id` text NOT NULL,\n\t`updated_at` integer NOT NULL,\n\t`deleted_at` integer\n);\n--> statement-breakpoint\nCREATE INDEX `quotation_items_quotation_idx` ON `quotation_items` (`quotation_id`);--> statement-breakpoint\nCREATE TABLE `quotations` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`quotation_no` text NOT NULL,\n\t`customer_id` text,\n\t`issued_at` integer NOT NULL,\n\t`valid_until` integer NOT NULL,\n\t`subtotal_paise` integer NOT NULL,\n\t`discount_paise` integer DEFAULT 0 NOT NULL,\n\t`bill_discount_paise` integer DEFAULT 0 NOT NULL,\n\t`taxable_paise` integer NOT NULL,\n\t`cgst_paise` integer DEFAULT 0 NOT NULL,\n\t`sgst_paise` integer DEFAULT 0 NOT NULL,\n\t`round_off_paise` integer DEFAULT 0 NOT NULL,\n\t`grand_total_paise` integer NOT NULL,\n\t`accepted_invoice_id` text,\n\t`notes` text,\n\t`shop_id` text NOT NULL,\n\t`device_id` text NOT NULL,\n\t`updated_at` integer NOT NULL,\n\t`deleted_at` integer\n);\n--> statement-breakpoint\nCREATE INDEX `quotations_shop_issued_idx` ON `quotations` (`shop_id`,`issued_at`);",
   m0005: "ALTER TABLE `invoices` ADD `amended_at` integer;",
   m0006: "ALTER TABLE `invoices` ADD `cancelled_at` integer;",
+  m0007: "ALTER TABLE `invoice_items` ADD `hsn_code` text;--> statement-breakpoint\nALTER TABLE `quotation_items` ADD `hsn_code` text;",
 };
 
 export default { journal, migrations };

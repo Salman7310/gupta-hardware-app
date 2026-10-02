@@ -219,6 +219,26 @@ describe('CreateInvoice', () => {
     expect(saved.ok && saved.value.invoiceNo).toBe('GH/A/0001');
   });
 
+  it('refuses to record more paid than the bill comes to', async () => {
+    const { createInvoice, repo } = build();
+
+    // 2 box x 450 + 18% = 1,062.00
+    const result = await createInvoice.execute(aBill({ paid: Money.fromRupees(5000) }));
+
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.error.code).toBe('invoice.overpaid');
+    // Nothing written: no bill, so no receipt and no stock movement either.
+    expect(await (repo as InMemoryInvoiceRepository).listRecent(10)).toHaveLength(0);
+  });
+
+  it('records a payment of exactly the bill total', async () => {
+    const { createInvoice } = build();
+
+    const result = await createInvoice.execute(aBill({ paid: Money.fromRupees(1062) }));
+
+    expect(result.ok && result.value.paid.paise).toBe(106_200);
+  });
+
   it('returns an error rather than throwing when the write fails', async () => {
     const failing: InvoiceRepository = {
       findById: async () => null,

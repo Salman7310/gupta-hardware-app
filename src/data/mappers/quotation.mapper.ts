@@ -35,6 +35,7 @@ export function toQuotationItem(row: ItemRow): QuotationItem {
     discountBps: row.discountBps,
     discount: Money.fromPaise(row.discountPaise),
     lineTotal: Money.fromPaise(row.linePaise),
+    hsnCode: row.hsnCode,
   };
 }
 
@@ -104,6 +105,7 @@ export function toQuotationItemRow(
     unitCode: item.quantity.unit.code,
     dimensionsJson: working.length > 0 ? JSON.stringify(working) : null,
     linePaise: item.lineTotal.paise,
+    hsnCode: item.hsnCode,
     shopId,
     deviceId,
     updatedAt,
