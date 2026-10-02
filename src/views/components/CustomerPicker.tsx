@@ -9,6 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { KeyboardAware } from './KeyboardAware';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Customer } from '../../models/customer';
 import { useCustomerPickerViewModel } from '../../viewmodels/useCustomerPickerViewModel';
@@ -43,7 +44,7 @@ export function CustomerPicker({
 
   if (vm.isAdding) {
     return (
-      <View style={screen}>
+      <KeyboardAware style={screen}>
         <Header title="New customer" actionLabel="Cancel" onAction={vm.cancelAdding} />
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
           <Field
@@ -91,12 +92,12 @@ export function CustomerPicker({
             </Text>
           </Pressable>
         </ScrollView>
-      </View>
+      </KeyboardAware>
     );
   }
 
   return (
-    <View style={screen}>
+    <KeyboardAware style={screen}>
       <Header title={title} actionLabel="Close" onAction={onClose} />
 
       <TextInput
@@ -147,7 +148,7 @@ export function CustomerPicker({
           </Pressable>
         )}
       />
-    </View>
+    </KeyboardAware>
   );
 }
 

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, ScrollView, Text, View } from 'react-native';
+import { Modal, ScrollView, Text, View } from 'react-native';
+import { KeyboardAware } from '../components/KeyboardAware';
 import { Invoice } from '../../models/invoice';
 import { CustomerPicker } from '../components/CustomerPicker';
 import {
@@ -46,10 +47,7 @@ export function BillScreen({ onSaved, start }: Props) {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <KeyboardAware style={styles.flex}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {vm.startedFrom ? (
           <Text style={styles.note}>
@@ -166,6 +164,6 @@ export function BillScreen({ onSaved, start }: Props) {
           onClose={() => setIsPicking(false)}
         />
       </Modal>
-    </KeyboardAvoidingView>
+    </KeyboardAware>
   );
 }

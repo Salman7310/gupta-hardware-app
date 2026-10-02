@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { KeyboardAware } from '../components/KeyboardAware';
 import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Money, formatDate, formatTime } from '../../core';
@@ -256,7 +257,7 @@ function AddItemsSheet({ vm }: { vm: InvoiceDetailViewModel }) {
   const { adding } = vm;
 
   return (
-    <View style={[styles.sheet, { paddingTop: insets.top + space.lg }]}>
+    <KeyboardAware style={[styles.sheet, { paddingTop: insets.top + space.lg }]}>
       <View style={styles.sheetHead}>
         <Text style={styles.sheetTitle}>Add to this bill</Text>
         <Pressable onPress={() => closeAdding(vm)} accessibilityRole="button" hitSlop={12}>
@@ -317,7 +318,7 @@ function AddItemsSheet({ vm }: { vm: InvoiceDetailViewModel }) {
           onClose={() => setIsPicking(false)}
         />
       </Modal>
-    </View>
+    </KeyboardAware>
   );
 }
 
@@ -327,7 +328,7 @@ function RecordPayment({ vm }: { vm: InvoiceDetailViewModel }) {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.sheet, { paddingTop: insets.top + space.lg }]}>
+    <KeyboardAware style={[styles.sheet, { paddingTop: insets.top + space.lg }]}>
       <View style={styles.sheetHead}>
         <Text style={styles.sheetTitle}>Record a payment</Text>
         <Pressable onPress={() => closeRecording(vm)} accessibilityRole="button" hitSlop={12}>
@@ -379,7 +380,7 @@ function RecordPayment({ vm }: { vm: InvoiceDetailViewModel }) {
           <Text style={styles.saveLabel}>{vm.isSaving ? 'Saving…' : 'Record payment'}</Text>
         </Pressable>
       </ScrollView>
-    </View>
+    </KeyboardAware>
   );
 }
 

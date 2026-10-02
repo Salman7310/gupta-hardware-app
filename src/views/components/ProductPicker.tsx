@@ -8,6 +8,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { KeyboardAware } from './KeyboardAware';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { unitFor } from '../../core';
 import { Product } from '../../models/product';
@@ -28,7 +29,7 @@ export function ProductPicker({ onPick, onClose }: Props) {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.picker, { paddingTop: insets.top + space.lg }]}>
+    <KeyboardAware style={[styles.picker, { paddingTop: insets.top + space.lg }]}>
       <View style={styles.pickerHead}>
         <Text style={styles.pickerTitle}>Add an item</Text>
         <Pressable onPress={onClose} accessibilityRole="button" hitSlop={12}>
@@ -64,7 +65,7 @@ export function ProductPicker({ onPick, onClose }: Props) {
           </Pressable>
         )}
       />
-    </View>
+    </KeyboardAware>
   );
 }
 

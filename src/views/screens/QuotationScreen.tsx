@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, ScrollView, Text, View } from 'react-native';
+import { Modal, ScrollView, Text, View } from 'react-native';
+import { KeyboardAware } from '../components/KeyboardAware';
 import { Quotation } from '../../models/quotation';
 import { CustomerPicker } from '../components/CustomerPicker';
 import {
@@ -51,10 +52,7 @@ export function QuotationScreen({ onSaved }: Props) {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <KeyboardAware style={styles.flex}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.note}>
           An estimate to hand over, not a bill. Nothing is sold, no stock moves and nothing is
@@ -163,6 +161,6 @@ export function QuotationScreen({ onSaved }: Props) {
           onClose={() => setIsPicking(false)}
         />
       </Modal>
-    </KeyboardAvoidingView>
+    </KeyboardAware>
   );
 }

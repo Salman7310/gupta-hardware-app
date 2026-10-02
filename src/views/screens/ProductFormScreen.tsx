@@ -1,14 +1,13 @@
 import React from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { KeyboardAware } from '../components/KeyboardAware';
 import { ALL_UNITS, UnitCode, unitFor } from '../../core';
 import { CATEGORY_LABELS, ProductCategory } from '../../models/product';
 import { useProductFormViewModel } from '../../viewmodels/useProductFormViewModel';
@@ -90,10 +89,7 @@ export function ProductFormScreen({
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <KeyboardAware style={styles.flex}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         {productId ? <StockCard productId={productId} /> : null}
 
@@ -201,7 +197,7 @@ export function ProductFormScreen({
           </Text>
         </Pressable>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAware>
   );
 }
 

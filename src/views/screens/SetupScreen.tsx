@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,6 +7,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { KeyboardAware } from '../components/KeyboardAware';
 import { ShopField, ShopSetupInput, shopFieldErrors } from '../../services/identity';
 
 interface Props {
@@ -47,10 +46,7 @@ export function SetupScreen({ onSubmit, isSubmitting, error }: Props) {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <KeyboardAware style={styles.flex}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Set up your shop</Text>
         <Text style={styles.subtitle}>
@@ -118,7 +114,7 @@ export function SetupScreen({ onSubmit, isSubmitting, error }: Props) {
           <Text style={styles.buttonLabel}>{isSubmitting ? 'Saving…' : 'Start using the app'}</Text>
         </Pressable>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAware>
   );
 }
 

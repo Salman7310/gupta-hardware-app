@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAware } from './KeyboardAware';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { unitFor } from '../../core';
 import {
@@ -105,7 +106,7 @@ function StockSheet({ vm, action }: { vm: ProductStockViewModel; action: StockAc
   const unit = unitFor(vm.product!.unitCode);
 
   return (
-    <View style={[styles.sheet, { paddingTop: insets.top + space.lg }]}>
+    <KeyboardAware style={[styles.sheet, { paddingTop: insets.top + space.lg }]}>
       <View style={styles.sheetHead}>
         <Text style={styles.sheetTitle}>{copy.title}</Text>
         <Pressable onPress={() => close(vm)} accessibilityRole="button" hitSlop={12}>
@@ -147,7 +148,7 @@ function StockSheet({ vm, action }: { vm: ProductStockViewModel; action: StockAc
           <Text style={styles.saveLabel}>{vm.isSaving ? copy.saving : copy.save}</Text>
         </Pressable>
       </ScrollView>
-    </View>
+    </KeyboardAware>
   );
 }
 

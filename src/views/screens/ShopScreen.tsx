@@ -1,8 +1,6 @@
 import React, { useCallback } from 'react';
 import {
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,6 +8,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { KeyboardAware } from '../components/KeyboardAware';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatDate } from '../../core';
 import { useFocusEffect } from 'expo-router';
@@ -246,10 +245,7 @@ function ShopDetailsSheet({ vm }: { vm: ShopViewModel }) {
 
   return (
     <Modal visible={vm.isEditing} animationType="slide" onRequestClose={() => closeEditing(vm)}>
-      <KeyboardAvoidingView
-        style={[styles.sheet, { paddingTop: insets.top + space.lg }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardAware style={[styles.sheet, { paddingTop: insets.top + space.lg }]}>
         <View style={styles.sheetHead}>
           <Text style={styles.sheetTitle}>Shop details</Text>
           <Pressable onPress={() => closeEditing(vm)} accessibilityRole="button" hitSlop={12}>
@@ -308,7 +304,7 @@ function ShopDetailsSheet({ vm }: { vm: ShopViewModel }) {
             <Text style={styles.saveLabel}>{vm.isSaving ? 'Saving…' : 'Save details'}</Text>
           </Pressable>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAware>
     </Modal>
   );
 }
