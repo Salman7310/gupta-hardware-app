@@ -2,7 +2,7 @@
   "expo": {
     "name": "Gupta Home Solutions",
     "slug": "gupta-hardware-app",
-    "version": "0.1.5",
+    "version": "0.1.6",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -15,7 +15,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.guptahardware.billing",
-      "versionCode": 7
+      "versionCode": 8
     },
     "plugins": [
       "expo-router",
